@@ -74,6 +74,47 @@
         "dest":  "models/qwen3.5-0.8b/Qwen3.5-0.8B-Q4_K_M.gguf"
     },
     {
+        "name":  "Parakeet-TDT-0.6B-v3 int8 (sherpa-onnx)",
+        "url":  "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+        "sha256":  "5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf",
+        "dest":  "downloads/voice/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+        "extractTo":  "voice/models"
+    },
+    {
+        "name":  "Kokoro multi-lang v1.1 int8 (sherpa-onnx)",
+        "url":  "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_1.tar.bz2",
+        "sha256":  "259c9c8bc906d6078e4e0570421885dabb68b539c2f970fcbb890a58eeaf3e9c",
+        "dest":  "downloads/voice/kokoro-int8-multi-lang-v1_1.tar.bz2",
+        "extractTo":  "voice/models"
+    },
+    {
+        "name":  "Kokoro multi-lang v1.1 fp32 (sherpa-onnx)",
+        "url":  "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_1.tar.bz2",
+        "sha256":  "b78e1ac42b852e839cceaafbe88f66806bf5860992d1d7b9a3f2ad1198427aed",
+        "dest":  "downloads/voice/kokoro-multi-lang-v1_1.tar.bz2",
+        "extractTo":  "voice/models"
+    },
+    {
+        "name":  "Silero VAD (sherpa-onnx)",
+        "url":  "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+        "sha256":  "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+        "dest":  "voice/models/silero_vad.onnx"
+    },
+    {
+        "name":  "KWS zipformer gigaspeech 3.3M (sherpa-onnx)",
+        "url":  "https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.tar.bz2",
+        "sha256":  "f170013b4716e41b62b9bfd809687c207cef798ef9bc6534d524e17af9b6561a",
+        "dest":  "downloads/voice/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.tar.bz2",
+        "extractTo":  "voice/models"
+    },
+    {
+        "name":  "Piper LibriTTS-R medium (sherpa-onnx)",
+        "url":  "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-libritts_r-medium.tar.bz2",
+        "sha256":  "10dc268f3e371696d721486123e2705a9fc1faa113491979fde4d88dba1f1b1c",
+        "dest":  "downloads/voice/vits-piper-en_US-libritts_r-medium.tar.bz2",
+        "extractTo":  "voice/models"
+    },
+    {
         "name":  "uv 0.13.6",
         "url":  "https://github.com/astral-sh/uv/releases/download/0.13.6/uv-x86_64-pc-windows-msvc.zip",
         "sha256":  "a2a8820d5eea32f08ef467ef3b7f66883a9b076d5737a2fc2fbb5f458d1bb50f",

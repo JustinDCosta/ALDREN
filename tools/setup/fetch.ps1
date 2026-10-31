@@ -45,7 +45,14 @@ foreach ($e in $entries) {
 
     if ($e.extractTo) {
         $target = Join-Path $DataRoot $e.extractTo
-        Expand-Archive -Path $dest -DestinationPath $target -Force
+        New-Item -ItemType Directory -Force $target | Out-Null
+        if ($dest -like '*.tar.bz2') {
+            tar.exe -xjf $dest -C $target
+            if ($LASTEXITCODE -ne 0) { throw "Extraction failed: $($e.name)" }
+        }
+        else {
+            Expand-Archive -Path $dest -DestinationPath $target -Force
+        }
         Write-Output "extracted $($e.name) -> $target"
     }
 }

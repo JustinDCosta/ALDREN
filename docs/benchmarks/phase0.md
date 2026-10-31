@@ -20,6 +20,13 @@ Full URLs (commit-pinned for Hugging Face) are in [tools/setup/phase0-downloads.
 | Granite 4.2 3B Q4_K_M | ibm-granite/granite-4.2-3b-GGUF @ c40945d | `e0406663965846ae22a403456eb826ccce5f450840491f71952f18a7cb78e7d5` |
 | LFM2.5-1.2B Q4_K_M | LiquidAI/LFM2.5-1.2B-Instruct-GGUF @ 8ed2880 | `b1b3de114215d9507409a662a501a631095a479a419584e8a2ded6304b19b4f5` |
 | Qwen3.5-0.8B Q4_K_M | unsloth/Qwen3.5-0.8B-GGUF @ 6ab4614 | `bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517` |
+| Parakeet-TDT-0.6B v3 int8 | sherpa-onnx asr-models release | `5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf` |
+| Silero VAD | sherpa-onnx asr-models release | `9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6` |
+| Kokoro multi-lang v1.1 int8 | sherpa-onnx tts-models release | `259c9c8bc906d6078e4e0570421885dabb68b539c2f970fcbb890a58eeaf3e9c` |
+| Kokoro multi-lang v1.1 fp32 (downloaded because int8 missed the TTS budget) | sherpa-onnx tts-models release | `b78e1ac42b852e839cceaafbe88f66806bf5860992d1d7b9a3f2ad1198427aed` |
+| Piper LibriTTS-R medium | sherpa-onnx tts-models release | `10dc268f3e371696d721486123e2705a9fc1faa113491979fde4d88dba1f1b1c` |
+| Keyword-spotting baseline (zipformer gigaspeech 3.3M) | sherpa-onnx kws-models release | `f170013b4716e41b62b9bfd809687c207cef798ef9bc6534d524e17af9b6561a` (no published digest for this 2024 asset; computed at download, size matched the release) |
+| sherpa-onnx (NuGet `org.k2fsa.sherpa.onnx`) and NAudio | 2.0.1 and 3.3.0 | pinned in `spikes/S3.Voice/S3.Voice.csproj` |
 | uv | 0.13.6 | `a2a8820d5eea32f08ef467ef3b7f66883a9b076d5737a2fc2fbb5f458d1bb50f` |
 | CPython (uv-managed) | 3.12.16 | checked by uv against its built-in checksums; installed with `--no-bin --no-registry` |
 | Python packages for `tools/wakeword-trainer` | see `uv.lock` | every wheel's SHA-256 is in the lock file |
@@ -102,3 +109,24 @@ What it took, for Phase 3:
 - **Hotkey:** Ctrl+Alt+Space was already taken on this PC (most likely by the Claude desktop app), so ALDREN's hotkey must be configurable and detect conflicts. The spike falls back to Ctrl+Alt+Shift+Space.
 - **Measuring smoothness:** `DwmGetCompositionTimingInfo` counted 50 refreshes where about 2,186 elapsed, so frame pacing comes from Windows Graphics Capture frame timestamps instead.
 - **Memory:** Task Manager's figure (private working set) is 35 MB; the total working set of 134 MB includes WinUI's shared DLL pages.
+
+## S3: voice pipeline (in progress)
+
+Console probe in `spikes/S3.Voice` (sherpa-onnx 2.0.1, NAudio 3.3.0), CPU only, and nothing is ever played through the speakers. Measured so far without a microphone: text-to-speech timing, and the VAD → speech-recognition path on commands spoken by the TTS voice. Raw output is in `E:\AldrenData\bench\s3`.
+
+| Measure | Result | Target |
+|---|---|---|
+| End of speech detected (Silero VAD, 400 ms hangover) | 400 ms after the last word | |
+| Speech recognition, Parakeet-TDT 0.6B v3 int8, 4 threads | 200 ms p50 for 1.9 s commands, 296 ms for a 2.9 s one (11% of real time) | ≤ 400 ms for 3–5 s utterances; this extrapolates to ~320–540 ms |
+| Recognition accuracy on clean synthetic speech | 8.9% word error rate, nearly all from words the TTS failed to say | Real target (≤ 10% English) uses your recordings |
+| First audio, Kokoro v1.1 int8, 2–6 threads | 2.3–2.9 s for a short reply, slower than real time; more threads don't help | ≤ 300 ms |
+| First audio, Kokoro v1.1 fp32, 4 threads | 655–680 ms for "Sure, boss.", 825–850 ms for "Opening Spotify now, boss." | ≤ 300 ms |
+| End of speech + recognition + first audio (CPU, fp32) | ~1.3 s for a short command and reply | ≤ 1.1 s |
+
+Findings:
+- **sherpa-onnx 2.0 dropped its built-in espeak-ng phonemiser** (espeak-ng is GPL). Kokoro v1.1 now reads English through a fixed word list and silently skips words it doesn't know: "Spotify", "what's", "skip", "downloads" and "notifications" vanished from the synthetic commands. Piper voices now need an external phonemiser, which also affects the synthetic training clips planned for S4.
+- **The installed Kokoro v1.1 is the Chinese and English release:** three English voices, no French voice.
+- **int8 Kokoro is about 3.5× slower than fp32 on this CPU**, so the quantised model is the wrong choice here.
+- Recognition is fast enough on the CPU; text-to-speech is not, so it needs a decision before Phase 3: a phonemiser and Kokoro v1.0 for French and better English voices, the GPU for synthesis, and pre-recorded acknowledgements ("Sure, boss.") to cover the wait.
+
+Still to do, with you: word error rate on your recorded commands, the three microphones live, the unplug test ("Input device disappeared"), and the Bluetooth headset check.
