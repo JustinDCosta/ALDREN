@@ -66,4 +66,5 @@ def session_prompts() -> list[Prompt]:
     commands = [Prompt("command", text, "en", 5.0) for text in COMMANDS_EN]
     commands += [Prompt("command", text, "fr", 5.0) for text in COMMANDS_FR]
     noise = [Prompt("noise", "", "stay quiet, normal room sounds", 30.0)]
-    return wake + commands + noise
+    # Commands first: the first few can be transcribed straight away to prove the takes are intelligible.
+    return commands + wake + noise

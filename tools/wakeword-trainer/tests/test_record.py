@@ -85,6 +85,15 @@ def test_ambiguous_device_name_is_rejected():
         record.pick_device(DEVICES, APIS, "Maono", "Windows WASAPI")
 
 
+def test_slow_delivery_is_detected():
+    # What PortAudio did with the PD300X at 192 kHz: one second's worth of frames took 2.07 s to arrive.
+    assert not record.delivery_rate_ok(frames=192_000, seconds=2.07, nominal=192_000)
+
+
+def test_normal_delivery_passes():
+    assert record.delivery_rate_ok(frames=48_000, seconds=1.02, nominal=48_000)
+
+
 def test_device_loss_aborts_with_exit_code_2(tmp_path, capsys):
     session = record.Session(tmp_path, "2026-11-01")
 

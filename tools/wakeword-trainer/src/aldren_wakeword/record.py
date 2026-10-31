@@ -17,9 +17,19 @@ from aldren_wakeword.prompts import Prompt, session_prompts
 SAMPLE_RATE = 16_000
 CLIP_PEAK = 0.99
 
+# Asked of Windows, which converts from the device's own format. Through PortAudio's WASAPI path the PD300X (192 kHz)
+# arrived at about half speed (93k frames/s) whatever rate was requested, which squeezed every take of the 2026-10-31
+# session 2x in time. MME goes through the Windows audio engine and delivers on time; every read is timed regardless.
+CAPTURE_RATE = 48_000
+DEFAULT_HOST_API = "MME"
+
 
 class DeviceLost(Exception):
     """The pinned input device vanished or changed format mid-session."""
+
+
+class DeliveryRateError(Exception):
+    """The device delivers audio faster or slower than its format says, so takes would be distorted."""
 
 
 class Recorder(Protocol):
@@ -95,7 +105,7 @@ def run(session: Session, recorder: Recorder, prompts: list[Prompt], ask: Callab
             i -= 1
             continue
 
-        print(f"Recording {prompt.seconds:.1f} s...")
+        print("Get ready...")
         try:
             audio = recorder.record(prompt.seconds)
         except DeviceLost as lost:
@@ -112,6 +122,12 @@ def run(session: Session, recorder: Recorder, prompts: list[Prompt], ask: Callab
 
     print(f"\nDone: {len(planned)} takes in {session.folder}.")
     return 0
+
+
+def delivery_rate_ok(frames: int, seconds: float, nominal: int, tolerance: float = 0.1) -> bool:
+    """True when a blocking read of `frames` took about as long as it should at `nominal` frames per second."""
+    expected = frames / nominal
+    return abs(seconds - expected) <= expected * tolerance
 
 
 def pick_device(devices: list[dict], apis: list[dict], wanted: str, api: str) -> tuple[int, str, int]:
@@ -138,30 +154,47 @@ class Microphone:
         self._sd = sounddevice
         self._wanted = (name, host_api)
         self.index, self.name, self.rate = self._find()
+        self.channels = min(2, int(self._sd.query_devices(self.index)["max_input_channels"]))
+
+        # A one-second self-test before anything is recorded: the 2026-10-31 session was lost to a bad rate.
+        frames, seconds = self._read(1.0)
+        if not delivery_rate_ok(frames, seconds, CAPTURE_RATE):
+            raise DeliveryRateError(f"{self.name} delivered 1.0 s of audio in {seconds:.2f} s; refusing to record.")
 
     def _find(self) -> tuple[int, str, int]:
         wanted, api = self._wanted
         return pick_device(list(self._sd.query_devices()), list(self._sd.query_hostapis()), wanted, api)
 
+    def _read(self, seconds: float, keep: list[np.ndarray] | None = None, announce: bool = False) -> tuple[int, float]:
+        import time
+
+        api = self._sd.query_hostapis(self._sd.query_devices(self.index)["hostapi"])["name"]
+        settings = self._sd.WasapiSettings(auto_convert=True) if "WASAPI" in api else None
+        with self._sd.InputStream(device=self.index, channels=self.channels, samplerate=CAPTURE_RATE, dtype="float32",
+                                  extra_settings=settings) as stream:
+            stream.read(CAPTURE_RATE // 10)  # let the stream settle before timing
+            if announce:
+                print(f"Speak now ({seconds:.1f} s).", flush=True)  # opening the stream takes ~1.5 s, so only now
+            start = time.perf_counter()
+            data, _ = stream.read(int(CAPTURE_RATE * seconds))
+            elapsed = time.perf_counter() - start
+        if keep is not None:
+            keep.append(data)
+        return data.shape[0], elapsed
+
     def record(self, seconds: float) -> np.ndarray:
         from scipy.signal import resample_poly
 
-        # PortAudio only notices an unplugged or reconfigured device after re-initialising.
-        self._sd._terminate()
-        self._sd._initialize()
+        # An unplugged device makes opening the stream fail; a reconfigured one fails the timing check below.
+        # (Re-initialising PortAudio to refresh its device list took several seconds per take.)
+        captured: list[np.ndarray] = []
         try:
-            index, name, rate = self._find()
-        except LookupError as error:
-            raise DeviceLost(self.name) from error
-        if (name, rate) != (self.name, self.rate):
-            raise DeviceLost(f"{self.name} at {self.rate} Hz is now {name} at {rate} Hz")
-
-        try:
-            with self._sd.InputStream(device=index, channels=1, samplerate=rate, dtype="float32") as stream:
-                data, _ = stream.read(int(rate * seconds))
+            frames, elapsed = self._read(seconds, captured, announce=True)
         except self._sd.PortAudioError as error:
             raise DeviceLost(self.name) from error
-        return resample_poly(data[:, 0], SAMPLE_RATE, rate).astype(np.float32)
+        if not delivery_rate_ok(frames, elapsed, CAPTURE_RATE):
+            raise DeviceLost(f"{self.name} delivered {seconds:.1f} s of audio in {elapsed:.2f} s")
+        return resample_poly(captured[0].mean(axis=1), SAMPLE_RATE, CAPTURE_RATE).astype(np.float32)
 
 
 def list_inputs() -> None:
@@ -176,7 +209,7 @@ def list_inputs() -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="aldren-record", description="Guided recording session for ALDREN's voice tests.")
     parser.add_argument("--device", help='part of the input device name, for example "Maono"')
-    parser.add_argument("--host-api", default="Windows WASAPI")
+    parser.add_argument("--host-api", default=DEFAULT_HOST_API)
     parser.add_argument("--out", type=Path, default=Path(r"E:\AldrenData\voice\recordings"))
     parser.add_argument("--session", default=datetime.date.today().isoformat())
     parser.add_argument("--list-devices", action="store_true", help="list the input devices and exit")
@@ -188,12 +221,12 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         microphone = Microphone(args.device, args.host_api)
-    except LookupError as error:
+    except (LookupError, DeliveryRateError) as error:
         print(error, file=sys.stderr)
         return 1
 
-    print(f"Recording from {microphone.name} ({args.host_api}, {microphone.rate} Hz, saved as 16 kHz mono) "
-          f"into {args.out / args.session}.")
+    print(f"Recording from {microphone.name} ({args.host_api}, device at {microphone.rate} Hz, captured at "
+          f"{CAPTURE_RATE} Hz through Windows, saved as 16 kHz mono) into {args.out / args.session}. Rate self-test passed.")
     try:
         return run(Session(args.out, args.session), microphone, session_prompts(), ask=input)
     except KeyboardInterrupt:
