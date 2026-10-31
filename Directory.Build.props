@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <!-- Native dependencies (llama.cpp, sherpa-onnx, ONNX Runtime) are x64 only. -->
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+</Project>

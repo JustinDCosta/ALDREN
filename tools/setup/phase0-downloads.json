@@ -1,0 +1,76 @@
+[
+    {
+        "name":  ".NET SDK 10.0.403",
+        "url":  "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.403/dotnet-sdk-10.0.403-win-x64.exe",
+        "sha512":  "cca8d82788252a8d13e778150a5e8393e204af274a12d19de7da10a0d98370a4edd5361ce5da73d0db13997fe5191e5db3a69c9665c6ddd6fba0d77845046f3c",
+        "dest":  "downloads/dotnet-sdk-10.0.403/dotnet-sdk-10.0.403-win-x64.exe"
+    },
+    {
+        "name":  "llama.cpp b12023 CUDA 13.4",
+        "url":  "https://github.com/ggml-org/llama.cpp/releases/download/b12023/llama-b12023-bin-win-cuda-13.4-x64.zip",
+        "sha256":  "394ca33a4e7636dc732076c0ecef312761984df0bf9594b1076cfd5808d4df66",
+        "dest":  "downloads/llama.cpp-b12023/llama-b12023-bin-win-cuda-13.4-x64.zip",
+        "extractTo":  "tools/llama.cpp/b12023"
+    },
+    {
+        "name":  "llama.cpp CUDA 13.4 runtime",
+        "url":  "https://github.com/ggml-org/llama.cpp/releases/download/b12023/cudart-llama-bin-win-cuda-13.4-x64.zip",
+        "sha256":  "738f8c251ac22b70c3ae6f83a10cf222725df0395246a2cf58f32bdb85fbe668",
+        "dest":  "downloads/llama.cpp-b12023/cudart-llama-bin-win-cuda-13.4-x64.zip",
+        "extractTo":  "tools/llama.cpp/b12023"
+    },
+    {
+        "name":  "Qwen3.5-4B Q4_K_M",
+        "url":  "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/e87f176479d0855a907a41277aca2f8ee7a09523/Qwen3.5-4B-Q4_K_M.gguf",
+        "sha256":  "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
+        "dest":  "models/qwen3.5-4b/Qwen3.5-4B-Q4_K_M.gguf"
+    },
+    {
+        "name":  "Qwen3.5-4B vision projector",
+        "url":  "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/e87f176479d0855a907a41277aca2f8ee7a09523/mmproj-F16.gguf",
+        "sha256":  "cd88edcf8d031894960bb0c9c5b9b7e1fea6ebee02b9f7ce925a00d12891f864",
+        "dest":  "models/qwen3.5-4b/mmproj-F16.gguf"
+    },
+    {
+        "name":  "Qwen3.5-2B Q4_K_M",
+        "url":  "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/f6d5376be1edb4d416d56da11e5397a961aca8ae/Qwen3.5-2B-Q4_K_M.gguf",
+        "sha256":  "aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223",
+        "dest":  "models/qwen3.5-2b/Qwen3.5-2B-Q4_K_M.gguf"
+    },
+    {
+        "name":  "Qwen3.5-9B Q3_K_M",
+        "url":  "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/Qwen3.5-9B-Q3_K_M.gguf",
+        "sha256":  "8fed90306e4f019e2bf35f3766470b7bc59ea1a9dae00f5ceb20b43cb5514393",
+        "dest":  "models/qwen3.5-9b/Qwen3.5-9B-Q3_K_M.gguf"
+    },
+    {
+        "name":  "Gemma 4 E2B QAT Q4_0",
+        "url":  "https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf/resolve/675cff42a74c774d6cb76f76d8eacb49b48c9b93/gemma-4-E2B_q4_0-it.gguf",
+        "sha256":  "fa401b55b07ee70a54c6dae3903c783a6e65064312529ea57175cb5f8dec6634",
+        "dest":  "models/gemma-4-e2b/gemma-4-E2B_q4_0-it.gguf"
+    },
+    {
+        "name":  "Gemma 4 E2B vision projector",
+        "url":  "https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf/resolve/675cff42a74c774d6cb76f76d8eacb49b48c9b93/gemma-4-E2B-it-mmproj.gguf",
+        "sha256":  "021059cce659fe7f9170d5599761d7bbaf644b798dab9503aca30dc43e6beb14",
+        "dest":  "models/gemma-4-e2b/gemma-4-E2B-it-mmproj.gguf"
+    },
+    {
+        "name":  "Granite 4.2 3B Q4_K_M",
+        "url":  "https://huggingface.co/ibm-granite/granite-4.2-3b-GGUF/resolve/c40945d71cd90f249a56985e8155551a9188dc30/granite-4.2-3b-Q4_K_M.gguf",
+        "sha256":  "e0406663965846ae22a403456eb826ccce5f450840491f71952f18a7cb78e7d5",
+        "dest":  "models/granite-4.2-3b/granite-4.2-3b-Q4_K_M.gguf"
+    },
+    {
+        "name":  "LFM2.5-1.2B Q4_K_M",
+        "url":  "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/8ed288026e23958ad9dfa92d53ed773a8eee7125/LFM2.5-1.2B-Instruct-Q4_K_M.gguf",
+        "sha256":  "b1b3de114215d9507409a662a501a631095a479a419584e8a2ded6304b19b4f5",
+        "dest":  "models/lfm2.5-1.2b/LFM2.5-1.2B-Instruct-Q4_K_M.gguf"
+    },
+    {
+        "name":  "Qwen3.5-0.8B Q4_K_M",
+        "url":  "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/6ab461498e2023f6e3c1baea90a8f0fe38ab64d0/Qwen3.5-0.8B-Q4_K_M.gguf",
+        "sha256":  "bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517",
+        "dest":  "models/qwen3.5-0.8b/Qwen3.5-0.8B-Q4_K_M.gguf"
+    }
+]
