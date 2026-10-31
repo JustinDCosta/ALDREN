@@ -36,11 +36,30 @@ internal sealed class CaptureClock : IDisposable
         };
         _session = _pool.CreateCaptureSession(item);
         _session.IsCursorCaptureEnabled = false;
+        // Capture otherwise throttles to ~60 frames/s, which on a 144 Hz panel shows up as a steady frame every
+        // third refresh (20.8 ms) and makes perfectly smooth motion look like 33% on time.
+        CapturesEveryRefresh = TryUncap(_session);
         _session.StartCapture();
     }
 
     /// <summary>Performance-counter time, the clock that SystemRelativeTime uses.</summary>
     public static TimeSpan Now => Stopwatch.GetElapsedTime(0);
+
+    /// <summary>False when this Windows build can't lower the capture's minimum update interval.</summary>
+    public bool CapturesEveryRefresh { get; }
+
+    private static bool TryUncap(GraphicsCaptureSession session)
+    {
+        try
+        {
+            session.MinUpdateInterval = TimeSpan.FromMilliseconds(1);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
 
     public List<TimeSpan> FramesBetween(TimeSpan from, TimeSpan to)
     {

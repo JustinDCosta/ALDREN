@@ -89,7 +89,7 @@ Restoring a saved prompt cache after a reload brought the 4B's first token from 
 
 ## S2: island overlay
 
-WinUI 3 prototype in `spikes/S2.Island` (Windows App SDK 2.6.4, unpackaged, self-contained). `S2.Island.exe --test` runs the automated checks against a stand-in app window and appends them to `E:\AldrenData\bench\s2\results.md`. So far measured on the Dell monitor only (60 Hz, 100% scaling): the internal panel was not active.
+WinUI 3 prototype in `spikes/S2.Island` (Windows App SDK 2.6.4, unpackaged, self-contained). `S2.Island.exe --test` runs the automated checks against a stand-in app window and appends them to `E:\AldrenData\bench\s2\results.md`; `--smoothness` runs only placement and frame pacing, without sending any input. Measured on the Dell (60 Hz, 100%) and the laptop panel (144 Hz, 125%), one screen at a time.
 
 | Check | Result |
 |---|---|
@@ -97,9 +97,9 @@ WinUI 3 prototype in `spikes/S2.Island` (Windows App SDK 2.6.4, unpackaged, self
 | 2. Never steals focus | Pass: 56/56 characters typed into another app while the island morphed 20 times, no foreground change |
 | 3. Click-through outside the pill, pill clickable | Pass |
 | 4. Above borderless fullscreen windows | Pass |
-| 5. Invisible to screen capture | Pass for GDI capture; OBS and Snipping Tool still to check by hand |
-| 6. ≥ 95% of frames on time across 50 morphs | Pass at 60 Hz (96.1% of refreshes got a new frame, 95.7% of gaps on time); 144 Hz not measured yet |
-| 7. Placement and scaling | Pass at 100%; 125% and the internal panel not measured yet |
+| 5. Invisible to screen capture | Pass: GDI capture (automated), OBS display capture and Snipping Tool (checked by you); the toggle makes it visible |
+| 6. ≥ 95% of frames on time across 50 morphs | Pass at 60 Hz (96.2% of refreshes got a new frame); smooth to the eye at 144 Hz. The automated 144 Hz number was capped by screen capture's default ~60 frames/s (a steady frame every third refresh), now uncapped for a rerun |
+| 7. Placement and scaling | Pass at 100% (Dell) and 125% (laptop panel) |
 | 8. Idle ≤ 120 MB and ~0% CPU, visible ≤ 100 ms after the hotkey | Pass: 35 MB private working set, 0.04% CPU, first frame 5.2 ms after the hotkey |
 
 What it took, for Phase 3:

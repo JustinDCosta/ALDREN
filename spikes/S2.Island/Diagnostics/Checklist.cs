@@ -10,7 +10,7 @@ namespace S2.Island.Diagnostics;
 /// Runs the automatable parts of the S2 checklist against a stand-in app window and appends the results to
 /// E:\AldrenData\bench\s2\results.md. Input is only ever sent to that window or to the island itself.
 /// </summary>
-internal sealed class Checklist(IslandWindow island)
+internal sealed class Checklist(IslandWindow island, bool smoothnessOnly = false)
 {
     private const string ResultsFolder = @"E:\AldrenData\bench\s2";
     private const string Sentence = "The quick brown fox jumps over the lazy dog, 0123456789.";
@@ -56,6 +56,14 @@ internal sealed class Checklist(IslandWindow island)
         island.PlaceOnMonitor(0);
         await MorphAsync(IslandState.Compact);
         Line($"- Island window after showing: {WindowStyles.Describe(island.Handle)}");
+        if (smoothnessOnly)
+        {
+            // No test window and no injected input: only the island morphing at the top of each screen.
+            await CheckAsync("6 + 7. Placement and smoothness per monitor", SmoothnessAsync);
+            await MorphAsync(IslandState.Hidden);
+            return;
+        }
+
         await StartTargetAsync();
 
         await CheckAsync("1 + 5. Transparency and capture exclusion", TransparencyAsync);
@@ -396,8 +404,10 @@ internal sealed class Checklist(IslandWindow island)
             int observed = 0, gaps = 0, onTime = 0;
             double expected = 0;
             var worst = TimeSpan.Zero;
+            bool uncapped;
             using (var capture = new CaptureClock(monitor.Handle))
             {
+                uncapped = capture.CapturesEveryRefresh;
                 await Task.Delay(300);
                 for (var k = 0; k < 50; k++)
                 {
@@ -435,6 +445,7 @@ internal sealed class Checklist(IslandWindow island)
             var steady = gaps == 0 ? 0 : (double)onTime / gaps;
             report.AppendLine($"  - 50 morphs, {elapsed * 1000 / 50:F0} ms each on average. First 300 ms of each, seen by Windows Graphics Capture: {observed} new frames for ~{expected:F0} refreshes ({delivered:P1}); {onTime}/{gaps} frame-to-frame gaps within 1.5 refreshes ({steady:P1}), worst gap {worst.TotalMilliseconds:F1} ms → **{Verdict(delivered >= 0.95 && steady >= 0.95)}** (item 6)");
             report.AppendLine($"  - DWM composition counters, for the record: {tally.Refreshes} refreshes counted where ~{elapsed * monitor.RefreshHz:F0} elapsed, so they are not usable on this system");
+            report.AppendLine($"  - Capture uncapped to every refresh: {uncapped}");
         }
 
         island.PlaceOnMonitor(0);
