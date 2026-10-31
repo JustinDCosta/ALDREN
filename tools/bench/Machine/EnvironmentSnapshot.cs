@@ -41,6 +41,21 @@ public record EnvironmentSnapshot(bool OnAc, string PowerPlan, int GpuPowerLimit
         return new EnvironmentSnapshot(PowerStatus.IsOnAc(), PlanName(plan), powerLimitW, usedMiB, NvidiaSmi.ParseComputeApps(apps));
     }
 
+    public static async Task<long> QueryVramUsedMiBAsync(CancellationToken ct)
+    {
+        var gpu = await RunAsync("nvidia-smi", "--query-gpu=power.limit,power.max_limit,memory.used --format=csv,noheader,nounits", ct);
+        return NvidiaSmi.ParseGpuQuery(gpu.Trim()).UsedMiB;
+    }
+
+    /// <summary>Waits until other models have released their VRAM, so the next measurement starts clean.</summary>
+    public static async Task WaitForVramAsync(long baselineMiB, CancellationToken ct)
+    {
+        for (var i = 0; i < 40 && await QueryVramUsedMiBAsync(ct) > baselineMiB + 150; i++)
+        {
+            await Task.Delay(500, ct);
+        }
+    }
+
     // "Power Scheme GUID: 8c5e7fda-... (High performance)" -> "High performance"
     private static string PlanName(string powercfgOutput)
     {

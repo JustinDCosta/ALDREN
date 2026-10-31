@@ -46,7 +46,22 @@ public sealed class LlamaServer : IAsyncDisposable
     public string LogPath { get; }
     public int ProcessId => _process.Id;
 
-    public static async Task<LlamaServer> StartAsync(LlamaServerOptions options, CancellationToken ct)
+    public static Task<LlamaServer> StartAsync(LlamaServerOptions options, CancellationToken ct) =>
+        StartWithAsync((port, apiKey) => Arguments(options, port, apiKey), ct);
+
+    /// <summary>Starts llama-server in router mode: it loads models from a folder on demand, at most maxModels at a time.</summary>
+    public static Task<LlamaServer> StartRouterAsync(string modelsDirectory, int maxModels, IReadOnlyList<string> extraArgs, CancellationToken ct) =>
+        StartWithAsync((port, apiKey) =>
+        [
+            "--models-dir", modelsDirectory,
+            "--models-max", maxModels.ToString(CultureInfo.InvariantCulture),
+            "--host", "127.0.0.1",
+            "--port", port.ToString(CultureInfo.InvariantCulture),
+            "--api-key", apiKey,
+            .. extraArgs,
+        ], ct);
+
+    private static async Task<LlamaServer> StartWithAsync(Func<int, string, IEnumerable<string>> arguments, CancellationToken ct)
     {
         var port = FreePort();
         var apiKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
@@ -58,7 +73,7 @@ public sealed class LlamaServer : IAsyncDisposable
             UseShellExecute = false,
             CreateNoWindow = true,
         };
-        foreach (var arg in Arguments(options, port, apiKey))
+        foreach (var arg in arguments(port, apiKey))
         {
             psi.ArgumentList.Add(arg);
         }

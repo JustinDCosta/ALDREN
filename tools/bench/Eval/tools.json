@@ -1,0 +1,88 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "launch_app",
+      "description": "Open an application by name.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "app": { "type": "string", "description": "Application name, for example Spotify or Visual Studio Code." }
+        },
+        "required": ["app"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "set_volume",
+      "description": "Set the system volume.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "level": { "type": "integer", "minimum": 0, "maximum": 100, "description": "0 is muted, 100 is maximum." }
+        },
+        "required": ["level"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "create_reminder",
+      "description": "Create a reminder.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "text": { "type": "string", "description": "What to remind the user about." },
+          "time": { "type": "string", "description": "24-hour time, HH:mm." },
+          "day": { "type": "string", "enum": ["today", "tomorrow", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] }
+        },
+        "required": ["text", "time", "day"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_agenda",
+      "description": "Read the user's calendar for a day.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "day": { "type": "string", "enum": ["today", "tomorrow", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] }
+        },
+        "required": ["day"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "delegate_to_action",
+      "description": "Hand the request to the part of ALDREN that can see the screen and operate the computer.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "task": { "type": "string", "description": "What needs to be done, in one sentence." }
+        },
+        "required": ["task"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "request_research",
+      "description": "Hand the request to online research for current information.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "What to look up." }
+        },
+        "required": ["query"]
+      }
+    }
+  }
+]

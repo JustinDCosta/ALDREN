@@ -8,7 +8,7 @@ public record ChatMessage(string Role, JsonNode Content)
     public static ChatMessage Of(string role, string text) => new(role, JsonValue.Create(text));
 }
 
-public record ChatRequest(IReadOnlyList<ChatMessage> Messages, int MaxTokens = 256, double Temperature = 0, JsonArray? Tools = null)
+public record ChatRequest(IReadOnlyList<ChatMessage> Messages, int MaxTokens = 256, double Temperature = 0, JsonArray? Tools = null, string? Model = null)
 {
     public JsonObject ToJson(bool stream)
     {
@@ -34,6 +34,11 @@ public record ChatRequest(IReadOnlyList<ChatMessage> Messages, int MaxTokens = 2
         if (Tools is not null)
         {
             body["tools"] = Tools.DeepClone();
+        }
+
+        if (Model is not null)
+        {
+            body["model"] = Model;
         }
 
         return body;
