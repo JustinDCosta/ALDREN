@@ -183,7 +183,8 @@ public sealed class LlamaServer : IAsyncDisposable
                 // Request timeout while busy loading.
             }
 
-            await Task.Delay(250, ct);
+            // Fine-grained polling keeps the measured load time close to the real one.
+            await Task.Delay(50, ct);
         }
 
         throw new TimeoutException($"llama-server was not ready after {StartupTimeout.TotalSeconds:F0} s; see {logPath}.");

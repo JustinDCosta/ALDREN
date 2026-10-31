@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-10-31 · Current phase: **Phase 0, prototypes and benchmarks (not started)**
+Last updated: 2026-10-31 · Current phase: **Phase 0, prototypes and benchmarks (in progress)**
 
 Labels: **Planned** · **In progress** · **Implemented** (code written, not yet verified) · **Tested** (verified on the target laptop) · **Partially working** · **Blocked** (external requirement)
 
@@ -10,17 +10,19 @@ Labels: **Planned** · **In progress** · **Implemented** (code written, not yet
 |---|---|---|
 | Architecture v2 (including the FreeLLMAPI gateway) | Approved | 2026-10-31 |
 | Documentation baseline | Implemented | Awaiting your review |
-| Git repository | Implemented | Branch `main`, pushed to GitHub |
-| Phase 0 plan | Written | [plans/phase-0.md](plans/phase-0.md); awaiting approval |
+| Git repository | Implemented | `main` pushed to GitHub; Phase 0 work on branch `phase-0` |
+| Phase 0 plan | Approved | 2026-10-31, [plans/phase-0.md](plans/phase-0.md) |
 
 ## Features by phase
 
 | Feature | Phase | Status | Notes |
 |---|---|---|---|
-| Spikes S1–S8 | 0 | Planned | A detailed Phase 0 plan comes next, with every install and download listed for approval |
+| Benchmark tool (`tools/bench`) | 0 | Tested | Kept for regression runs |
+| S1 local model benchmarks | 0 | Tested | Qwen3.5-4B resident, Qwen3.5-9B deep tier via restart, Qwen3.5-0.8B CPU fallback; see [benchmarks/phase0.md](benchmarks/phase0.md) |
+| Spikes S2–S8 | 0 | Planned | |
 | Core and App processes, IPC, tray, startup, configuration, logging | 1 | Planned | |
 | Tool Gateway, permissions, audit log | 1 | Planned | |
-| Local inference and residency manager | 2 | Planned | Models chosen in Phase 0 |
+| Local inference and residency manager | 2 | Planned | Models chosen in S1; the llama-server client must retry dropped keep-alive connections |
 | Orchestrator, fast path, router, persona | 2 | Planned | |
 | App launcher and basic system tools | 2 | Planned | |
 | Basic gaming mode (GPU unload) | 2 | Planned | |
@@ -46,5 +48,4 @@ Labels: **Planned** · **In progress** · **Implemented** (code written, not yet
 | Installer, updates, soak testing | 9 | Planned | |
 
 ## Waiting on you
-- Approval of the Phase 0 plan, including its installs and downloads.
 - During Phase 0: the manual steps listed in the plan (recordings, screen captures, Chrome toggles, provider keys, network switching).

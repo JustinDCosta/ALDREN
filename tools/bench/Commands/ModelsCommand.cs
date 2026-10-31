@@ -45,8 +45,9 @@ public static class ModelsCommand
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                ModelMeasurements.Log($"{spec.Name}: FAILED {ex.Message}");
-                results.Add(new ModelResult(spec.Name, spec.OnGpu, false, "", 0, 0, [], 0, null, 0, 0, 0, null, [], ex.Message));
+                ModelMeasurements.Log($"{spec.Name}: FAILED {ExceptionText.Chain(ex)}");
+                Console.WriteLine(ex);
+                results.Add(new ModelResult(spec.Name, spec.OnGpu, false, "", 0, 0, [], 0, null, 0, 0, 0, null, [], ExceptionText.Chain(ex)));
             }
 
             await SaveAsync(outDir, results, null, null);

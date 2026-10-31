@@ -19,13 +19,18 @@ public static class ChatClient
 
     public static async Task<string> PostAsync(Uri baseUri, string apiKey, string path, JsonNode body, CancellationToken ct)
     {
-        using var message = new HttpRequestMessage(HttpMethod.Post, new Uri(baseUri, path))
+        var content = body.ToJsonString();
+        HttpRequestMessage Message()
         {
-            Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json"),
-        };
-        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            var message = new HttpRequestMessage(HttpMethod.Post, new Uri(baseUri, path))
+            {
+                Content = new StringContent(content, Encoding.UTF8, "application/json"),
+            };
+            message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            return message;
+        }
 
-        using var response = await Http.SendAsync(message, ct);
+        using var response = await HttpRetry.SendAsync(Http, Message, HttpCompletionOption.ResponseContentRead, ct);
         var json = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
         {
@@ -37,9 +42,14 @@ public static class ChatClient
 
     public static async Task<string> GetAsync(Uri baseUri, string apiKey, string path, CancellationToken ct)
     {
-        using var message = new HttpRequestMessage(HttpMethod.Get, new Uri(baseUri, path));
-        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-        using var response = await Http.SendAsync(message, ct);
+        HttpRequestMessage Message()
+        {
+            var message = new HttpRequestMessage(HttpMethod.Get, new Uri(baseUri, path));
+            message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            return message;
+        }
+
+        using var response = await HttpRetry.SendAsync(Http, Message, HttpCompletionOption.ResponseContentRead, ct);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }

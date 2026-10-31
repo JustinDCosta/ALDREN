@@ -16,14 +16,19 @@ public static class StreamingProbe
 
     public static async Task<CompletionTiming> MeasureAsync(Uri baseUri, string apiKey, ChatRequest request, CancellationToken ct)
     {
-        using var message = new HttpRequestMessage(HttpMethod.Post, new Uri(baseUri, "v1/chat/completions"))
+        var json = request.ToJson(stream: true).ToJsonString();
+        HttpRequestMessage Message()
         {
-            Content = new StringContent(request.ToJson(stream: true).ToJsonString(), Encoding.UTF8, "application/json"),
-        };
-        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            var message = new HttpRequestMessage(HttpMethod.Post, new Uri(baseUri, "v1/chat/completions"))
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json"),
+            };
+            message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            return message;
+        }
 
         var clock = Stopwatch.StartNew();
-        using var response = await Http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, ct);
+        using var response = await HttpRetry.SendAsync(Http, Message, HttpCompletionOption.ResponseHeadersRead, ct);
         response.EnsureSuccessStatusCode();
         await using var body = await response.Content.ReadAsStreamAsync(ct);
 

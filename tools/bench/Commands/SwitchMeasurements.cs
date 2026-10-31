@@ -13,6 +13,7 @@ public sealed class SwitchMeasurements(ModelMeasurements models, ModelSpec quick
     [
         await TryAsync("restart process", () => RestartSwitchAsync(ct)),
         await TryAsync("router mode", () => RouterSwitchAsync(ct)),
+        await TryAsync("restart with saved prompt cache, no warmup (request includes system prompt)", () => CachedRestartSwitchAsync(ct)),
     ];
 
     public async Task<SlotResult> MeasureSlotRestoreAsync(CancellationToken ct)
@@ -46,8 +47,8 @@ public sealed class SwitchMeasurements(ModelMeasurements models, ModelSpec quick
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            ModelMeasurements.Log($"slot restore FAILED: {ex.Message}");
-            return new SlotResult(0, 0, ex.Message);
+            ModelMeasurements.Log($"slot restore FAILED: {ExceptionText.Chain(ex)}");
+            return new SlotResult(0, 0, ExceptionText.Chain(ex));
         }
     }
 
@@ -61,6 +62,30 @@ public sealed class SwitchMeasurements(ModelMeasurements models, ModelSpec quick
         await using var deepServer = await models.StartAsync(deep, 8192, false, ct);
         var beforeRequest = clock.Elapsed.TotalMilliseconds;
         var timing = await StreamingProbe.MeasureAsync(deepServer.BaseUri, deepServer.ApiKey, Short(), ct);
+        return beforeRequest + timing.TtftMs;
+    }
+
+    // What a real hand-over costs: the deep request carries the full system prompt, so its cache is saved once
+    // beforehand and restored right after the 9B loads; skipping the warmup run trims the load itself.
+    private async Task<double> CachedRestartSwitchAsync(CancellationToken ct)
+    {
+        var slots = Path.Combine(benchRoot, "slots");
+        Directory.CreateDirectory(slots);
+        await using (var prepare = await models.StartAsync(deep, 8192, false, ct, "--slot-save-path", slots))
+        {
+            await StreamingProbe.MeasureAsync(prepare.BaseUri, prepare.ApiKey, WithSystemPrompt("Hello."), ct);
+            await ChatClient.PostAsync(prepare.BaseUri, prepare.ApiKey, "slots/0?action=save", new JsonObject { ["filename"] = "deep-prefix.bin" }, ct);
+        }
+
+        var quickServer = await models.StartAsync(quick, 8192, false, ct);
+        await StreamingProbe.MeasureAsync(quickServer.BaseUri, quickServer.ApiKey, Short(), ct);
+
+        var clock = Stopwatch.StartNew();
+        await quickServer.DisposeAsync();
+        await using var deepServer = await models.StartAsync(deep, 8192, false, ct, "--slot-save-path", slots, "--no-warmup");
+        await ChatClient.PostAsync(deepServer.BaseUri, deepServer.ApiKey, "slots/0?action=restore", new JsonObject { ["filename"] = "deep-prefix.bin" }, ct);
+        var beforeRequest = clock.Elapsed.TotalMilliseconds;
+        var timing = await StreamingProbe.MeasureAsync(deepServer.BaseUri, deepServer.ApiKey, WithSystemPrompt("Name three primary colours."), ct);
         return beforeRequest + timing.TtftMs;
     }
 
@@ -107,8 +132,8 @@ public sealed class SwitchMeasurements(ModelMeasurements models, ModelSpec quick
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            ModelMeasurements.Log($"switch via {method} FAILED: {ex.Message}");
-            return new SwitchResult(method, 0, ex.Message);
+            ModelMeasurements.Log($"switch via {method} FAILED: {ExceptionText.Chain(ex)}");
+            return new SwitchResult(method, 0, ExceptionText.Chain(ex));
         }
     }
 
