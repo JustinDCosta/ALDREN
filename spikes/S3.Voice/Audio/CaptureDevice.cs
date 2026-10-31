@@ -84,8 +84,12 @@ internal sealed class CaptureDevice : IDisposable
         _enumerator.Dispose();
     }
 
+    /// <summary>Device frames received so far, straight from WASAPI (before any conversion).</summary>
+    public long RawFrames { get; private set; }
+
     private void OnData(object? sender, WaveInEventArgs e)
     {
+        RawFrames += e.BytesRecorded / _capture.WaveFormat.BlockAlign;
         _buffer.AddSamples(e.Buffer, 0, e.BytesRecorded);
         int read;
         while ((read = _output.Read(_chunk)) > 0)

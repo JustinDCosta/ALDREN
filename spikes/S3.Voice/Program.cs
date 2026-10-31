@@ -32,6 +32,32 @@ if (mode == "devices")
     return 0;
 }
 
+if (mode == "format")
+{
+    using var device = CaptureDevice.Open(Option("--device") ?? throw new ArgumentException("format needs --device"));
+    Console.WriteLine($"{device.Name}: Windows shared-mode format {device.Format}");
+    if (args.Contains("--measure"))
+    {
+        // Counts frames for a few seconds to compare the real delivery rate with the advertised one; keeps no audio.
+        device.Start();
+        Thread.Sleep(500);
+        var (startFrames, clock) = (device.RawFrames, System.Diagnostics.Stopwatch.StartNew());
+        Thread.Sleep(3000);
+        Console.WriteLine($"WASAPI delivered {(device.RawFrames - startFrames) / clock.Elapsed.TotalSeconds / 1000:F1} kHz of frames");
+    }
+
+    return 0;
+}
+
+if (mode == "wavinfo")
+{
+    var samples = AudioUtil.ReadWav(args[1]);
+    var peak = samples.Length == 0 ? 0 : samples.Max(Math.Abs);
+    var rms = samples.Length == 0 ? 0 : Math.Sqrt(samples.Average(s => (double)s * s));
+    Console.WriteLine($"{samples.Length} samples ({samples.Length / (double)AudioUtil.SampleRate:F2} s), peak {20 * Math.Log10(Math.Max(peak, 1e-9)):F1} dBFS, rms {20 * Math.Log10(Math.Max(rms, 1e-9)):F1} dBFS");
+    return 0;
+}
+
 var threads = int.Parse(Option("--threads") ?? "2", CultureInfo.InvariantCulture);
 var hangover = float.Parse(Option("--hangover") ?? "0.4", CultureInfo.InvariantCulture);
 var report = new StringBuilder();
@@ -111,7 +137,9 @@ int Files(string folder)
         if (root.GetProperty("kind").GetString() == "command")
         {
             var audio = AudioUtil.ReadWav(Path.Combine(folder, root.GetProperty("file").GetString()!));
-            rows.Add(Measure(vad, root.GetProperty("text").GetString()!, root.GetProperty("cue").GetString()!, audio));
+            var text = root.GetProperty("text").GetString()!;
+            var lang = root.GetProperty("cue").GetString()!;
+            rows.Add(args.Contains("--whole") ? MeasureWhole(text, lang, audio) : Measure(vad, text, lang, audio));
         }
     }
 
@@ -172,6 +200,14 @@ Row Measure(SherpaOnnx.VoiceActivityDetector vad, string reference, string lang,
     var (text, ms) = probe.Transcribe(heard.Utterance);
     var (errors, words) = Wer.Count(reference, text);
     return new Row(reference, lang, heard.Utterance.Length / (double)AudioUtil.SampleRate, heard.Segments, heard.DelayMs, ms, text, errors, words);
+}
+
+// Diagnostic: the whole clip straight to recognition, no VAD.
+Row MeasureWhole(string reference, string lang, float[] audio)
+{
+    var (text, ms) = probe.Transcribe(audio);
+    var (errors, words) = Wer.Count(reference, text);
+    return new Row(reference, lang, audio.Length / (double)AudioUtil.SampleRate, 1, double.NaN, ms, text, errors, words);
 }
 
 void Summarise(List<Row> rows, string source)
