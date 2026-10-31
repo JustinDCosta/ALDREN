@@ -1,0 +1,58 @@
+# --- Build output ---
+bin/
+obj/
+out/
+publish/
+artifacts/
+*.user
+*.suo
+.vs/
+.idea/
+
+# --- Editors (keep shared VS Code recommendations only) ---
+.vscode/*
+!.vscode/extensions.json
+
+# --- Node (Chrome extension, tooling) ---
+node_modules/
+dist/
+
+# --- Python (offline tools only) ---
+.venv/
+__pycache__/
+*.pyc
+
+# --- Local tooling ---
+.claude/
+CLAUDE.md
+
+# --- Models, data and anything personal: never commit ---
+# Models live in E:\AldrenData\models (see docs/ARCHITECTURE.md §18).
+models/
+*.gguf
+*.onnx
+*.safetensors
+*.bin
+# Databases and logs
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+logs/
+*.log
+# Audio can contain your voice (wake-word recordings, test fixtures): keep it outside git.
+*.wav
+*.flac
+*.mp3
+voice-data/
+# Secrets
+.env
+.env.*
+!.env.example
+*.pfx
+*.snk
+secrets/
+
+# --- Phase 0 and benchmark scratch output ---
+spikes/**/output/
+bench-results/

@@ -1,0 +1,2 @@
+# Normalise line endings in the repository; Git for Windows converts on checkout.
+* text=auto
