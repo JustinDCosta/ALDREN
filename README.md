@@ -19,6 +19,7 @@ A local-first, JARVIS-inspired personal AI assistant for Windows 11. You summon 
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | The approved design (the spec) |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Phases 0–9, deliverables and exit criteria |
 | [docs/STATUS.md](docs/STATUS.md) | What is planned, implemented, tested, partially working or blocked |
+| [docs/plans/phase-0.md](docs/plans/phase-0.md) | Phase 0 plan: prototypes and benchmarks |
 | [docs/SECURITY.md](docs/SECURITY.md) | Threat model, permissions, risk tiers, hardening |
 | [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) | Honest limits of the hardware, models and services |
 | [docs/decisions/](docs/decisions/README.md) | Architecture decision records: why each major choice was made |

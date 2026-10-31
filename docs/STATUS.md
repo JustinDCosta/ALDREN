@@ -10,7 +10,8 @@ Labels: **Planned** · **In progress** · **Implemented** (code written, not yet
 |---|---|---|
 | Architecture v2 (including the FreeLLMAPI gateway) | Approved | 2026-10-31 |
 | Documentation baseline | Implemented | Awaiting your review |
-| Git repository | Implemented | Initialised on branch `main` |
+| Git repository | Implemented | Branch `main`, pushed to GitHub |
+| Phase 0 plan | Written | [plans/phase-0.md](plans/phase-0.md); awaiting approval |
 
 ## Features by phase
 
@@ -45,5 +46,5 @@ Labels: **Planned** · **In progress** · **Implemented** (code written, not yet
 | Installer, updates, soak testing | 9 | Planned | |
 
 ## Waiting on you
-- A review of this documentation set before the Phase 0 plan is written.
-- For Phase 0: approval of the listed installs and downloads, and 50–100 recordings of you saying "ALDREN" for the wake-word spike.
+- Approval of the Phase 0 plan, including its installs and downloads.
+- During Phase 0: the manual steps listed in the plan (recordings, screen captures, Chrome toggles, provider keys, network switching).
