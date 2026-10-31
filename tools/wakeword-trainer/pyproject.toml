@@ -1,0 +1,24 @@
+[project]
+name = "aldren-wakeword"
+version = "0.1.0"
+description = "Offline tools for ALDREN's wake word and voice tests: recording, synthesis, training, evaluation"
+requires-python = "==3.12.*"
+dependencies = [
+    "numpy>=2.3",
+    "scipy>=1.16",
+    "sounddevice>=0.5.2",
+]
+
+[project.scripts]
+aldren-record = "aldren_wakeword.record:main"
+
+[dependency-groups]
+dev = ["pytest>=8.4"]
+
+[build-system]
+requires = ["uv_build>=0.13.6,<0.14"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--basetemp=E:/AldrenData/cache/pytest-wakeword"]

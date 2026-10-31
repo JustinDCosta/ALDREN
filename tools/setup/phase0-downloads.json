@@ -72,5 +72,12 @@
         "url":  "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/6ab461498e2023f6e3c1baea90a8f0fe38ab64d0/Qwen3.5-0.8B-Q4_K_M.gguf",
         "sha256":  "bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517",
         "dest":  "models/qwen3.5-0.8b/Qwen3.5-0.8B-Q4_K_M.gguf"
+    },
+    {
+        "name":  "uv 0.13.6",
+        "url":  "https://github.com/astral-sh/uv/releases/download/0.13.6/uv-x86_64-pc-windows-msvc.zip",
+        "sha256":  "a2a8820d5eea32f08ef467ef3b7f66883a9b076d5737a2fc2fbb5f458d1bb50f",
+        "dest":  "downloads/uv-0.13.6/uv-x86_64-pc-windows-msvc.zip",
+        "extractTo":  "tools/uv"
     }
 ]

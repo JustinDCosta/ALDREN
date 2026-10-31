@@ -20,6 +20,9 @@ Full URLs (commit-pinned for Hugging Face) are in [tools/setup/phase0-downloads.
 | Granite 4.2 3B Q4_K_M | ibm-granite/granite-4.2-3b-GGUF @ c40945d | `e0406663965846ae22a403456eb826ccce5f450840491f71952f18a7cb78e7d5` |
 | LFM2.5-1.2B Q4_K_M | LiquidAI/LFM2.5-1.2B-Instruct-GGUF @ 8ed2880 | `b1b3de114215d9507409a662a501a631095a479a419584e8a2ded6304b19b4f5` |
 | Qwen3.5-0.8B Q4_K_M | unsloth/Qwen3.5-0.8B-GGUF @ 6ab4614 | `bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517` |
+| uv | 0.13.6 | `a2a8820d5eea32f08ef467ef3b7f66883a9b076d5737a2fc2fbb5f458d1bb50f` |
+| CPython (uv-managed) | 3.12.16 | checked by uv against its built-in checksums; installed with `--no-bin --no-registry` |
+| Python packages for `tools/wakeword-trainer` | see `uv.lock` | every wheel's SHA-256 is in the lock file |
 
 ## S1: local models
 
