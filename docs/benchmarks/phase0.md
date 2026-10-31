@@ -76,3 +76,26 @@ Restoring a saved prompt cache after a reload brought the 4B's first token from 
 - **llama-server sometimes drops a keep-alive connection after a streamed reply.** The next request on that connection fails with "the response ended prematurely" (3 times in about 50 streaming requests on the CPU models in the reference run, 3 times in the earlier run). The server stays up and a new connection works. ALDREN's llama-server client must retry once when a request fails before any response arrives.
 - **Persona spot check** (all 15 replies of the 4B, read by hand): the tone is consistent (calm, "boss"), the language is right in 14 of 15 (an English greeting got a French reply, probably because the prompt says the user lives in Paris), the main weakness is length (several replies run to three or four sentences), and one question ("Do you like your job?") was misunderstood. This is prompt work for Phase 2.
 - **The 4B's other eval failures:** "What is this error message on my screen?" and "Trouve le fichier PDF que j'ai téléchargé hier" were answered directly instead of being delegated to the Action Brain, and "Find the error in my terminal and fix it" opened Windows Terminal instead of delegating.
+
+## S2: island overlay
+
+WinUI 3 prototype in `spikes/S2.Island` (Windows App SDK 2.6.4, unpackaged, self-contained). `S2.Island.exe --test` runs the automated checks against a stand-in app window and appends them to `E:\AldrenData\bench\s2\results.md`. So far measured on the Dell monitor only (60 Hz, 100% scaling): the internal panel was not active.
+
+| Check | Result |
+|---|---|
+| 1. Transparent outside the pill | Pass: 0 of 86,936 pixels differ from the window behind |
+| 2. Never steals focus | Pass: 56/56 characters typed into another app while the island morphed 20 times, no foreground change |
+| 3. Click-through outside the pill, pill clickable | Pass |
+| 4. Above borderless fullscreen windows | Pass |
+| 5. Invisible to screen capture | Pass for GDI capture; OBS and Snipping Tool still to check by hand |
+| 6. ≥ 95% of frames on time across 50 morphs | Pass at 60 Hz (96.1% of refreshes got a new frame, 95.7% of gaps on time); 144 Hz not measured yet |
+| 7. Placement and scaling | Pass at 100%; 125% and the internal panel not measured yet |
+| 8. Idle ≤ 120 MB and ~0% CPU, visible ≤ 100 ms after the hotkey | Pass: 35 MB private working set, 0.04% CPU, first frame 5.2 ms after the hotkey |
+
+What it took, for Phase 3:
+- **Transparency:** a custom `SystemBackdrop` with a clear system-compositor brush, DWM blur-behind with an empty off-screen region, black `WM_ERASEBKGND`, and `WM_NCCALCSIZE` returning 0. Without the last one WinUI keeps a 3-px frame that shows up white.
+- **Click-through:** `WS_EX_LAYERED | WS_EX_TRANSPARENT`, switched off only while the cursor is over the pill (checked every 33 ms). `WM_NCHITTEST` returning `HTTRANSPARENT` does not work: it only passes clicks to windows of the same thread, so the click outside the pill was swallowed (measured with `--nchittest`).
+- **Topmost:** a topmost fullscreen window activated after the island covers it, so the island reasserts topmost whenever it shows.
+- **Hotkey:** Ctrl+Alt+Space was already taken on this PC (most likely by the Claude desktop app), so ALDREN's hotkey must be configurable and detect conflicts. The spike falls back to Ctrl+Alt+Shift+Space.
+- **Measuring smoothness:** `DwmGetCompositionTimingInfo` counted 50 refreshes where about 2,186 elapsed, so frame pacing comes from Windows Graphics Capture frame timestamps instead.
+- **Memory:** Task Manager's figure (private working set) is 35 MB; the total working set of 134 MB includes WinUI's shared DLL pages.

@@ -19,7 +19,8 @@ Labels: **Planned** · **In progress** · **Implemented** (code written, not yet
 |---|---|---|---|
 | Benchmark tool (`tools/bench`) | 0 | Tested | Kept for regression runs |
 | S1 local model benchmarks | 0 | Tested | Qwen3.5-4B resident, Qwen3.5-9B deep tier via restart, Qwen3.5-0.8B CPU fallback; see [benchmarks/phase0.md](benchmarks/phase0.md) |
-| Spikes S2–S8 | 0 | Planned | |
+| S2 island overlay | 0 | In progress | WinUI 3 prototype passes every automated check on the 60 Hz monitor at 100% scaling; waiting on the manual checks (OBS, Snipping Tool, 144 Hz panel, 125% scaling) |
+| Spikes S3–S8 | 0 | Planned | |
 | Core and App processes, IPC, tray, startup, configuration, logging | 1 | Planned | |
 | Tool Gateway, permissions, audit log | 1 | Planned | |
 | Local inference and residency manager | 2 | Planned | Models chosen in S1; the llama-server client must retry dropped keep-alive connections |

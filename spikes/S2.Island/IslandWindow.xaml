@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="S2.Island.IslandWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="ALDREN island prototype">
+    <Grid x:Name="Root" Background="Transparent" PointerPressed="OnPointerPressed">
+        <!-- The pill itself is a Composition shape attached to PillHost; the caption sits above it. -->
+        <Border x:Name="PillHost" />
+        <TextBlock
+            x:Name="Caption"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Top"
+            FontFamily="Segoe UI Variable Text"
+            FontSize="14"
+            Foreground="#E6FFFFFF"
+            IsHitTestVisible="False"
+            TextAlignment="Center"
+            TextWrapping="Wrap" />
+    </Grid>
+</Window>
