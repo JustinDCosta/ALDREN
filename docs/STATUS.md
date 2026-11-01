@@ -22,7 +22,7 @@ Labels: **Planned** · **In progress** · **Implemented** (code written, not yet
 | S2 island overlay | 0 | Tested | WinUI 3 prototype passes all 8 checks (automated on both screens, plus your OBS, Snipping Tool and smoothness checks) |
 | Recording tool (`aldren-record`, shared by S3 and S4) | 0 | Tested | Fixed after the first session came out time-squeezed (PortAudio's WASAPI path ran the PD300X at half speed); the second session (112 takes, 2026-11-01) is clean |
 | S3 voice pipeline probe | 0 | In progress | On your voice: 5.4% English word error rate, 137 ms recognition; Supertonic 3 speaks in ~210 ms on the CPU, so a turn takes ~0.75 s plus the model's first sentence. Left: the live microphone, unplug and Bluetooth checks with you |
-| S4 wake word | 0 | In progress | Field test: in 3.8 h of your normal use, model 3 woke 704 times (183/h), never for the wake word (target ≤ 0.5/h). Retraining with those false alarms as negatives (model 4) |
+| S4 wake word | 0 | In progress | Field test: in 3.8 h of your normal use, model 3 woke 704 times (183/h), never for the wake word (target ≤ 0.5/h). Model 4, retrained on those false alarms, misses 3.7% of your takes and fires on 6 of 180 held-out field false alarms (model 3: 58), but still ~12/h on other audio. Next: a field run on model 4 |
 | S5 screen perception probe | 0 | In progress | On your 30 captures: UI Automation 478 ms p90 (Explorer 648 ms), but Discord, Steam and Epic expose no controls; Windows OCR reads 67% of the drawn UI labels (target 90%); the 4B model finds a named control 24% of the time with numbered boxes (target 80%) and 29% by pointing. Phase 5 resolves controls by name first and narrows what vision has to choose from |
 | S6 browser bridge probe | 0 | In progress | Through Chrome: ping 0.3 ms p90 (target 50 ms); read, click and fill work; injected instructions stay inert; passwords stay on the page. Left: the CDP attach steps |
 | S7 network identity probe | 0 | In progress | One fingerprint covers your Ethernet and Wi-Fi; Home in 1.6–1.7 s after a Wi-Fi reconnect, and the hotspot reads Away. Each reconnect briefly reads Away while Windows identifies the network, so ALDREN will debounce Away. Left: the reboot checks |
@@ -56,7 +56,7 @@ Labels: **Planned** · **In progress** · **Implemented** (code written, not yet
 
 ## Waiting on you
 - S3: a short live test on each microphone, unplugging the PD300X mid-capture once, and the Bluetooth headset check.
-- S4: keep the field listener running in normal use; it gets restarted on the retrained model once that's evaluated.
+- S4: restart the field listener on model 4 (Ctrl+C the current one, then `uv.ps1 run aldren-listen --model E:\AldrenData\voice\models\aldren-wakeword-4.npz --threshold 0.95`) and leave it on for a few hours of normal use.
 - S6: the CDP part only. Close the test-profile Chrome window, then run `CdpAttach.exe profile`. Turn remote debugging on at `chrome://inspect/#remote-debugging`, run `CdpAttach.exe attach` and approve Chrome's prompt, then turn it off again.
 - S7: after 2 reboots on each adapter, `S7.Network.exe snapshot` (skip if done: reboots don't show in the watch log).
 - S8, about 30 minutes: start the gateway (`spikes\S8.Gateway\start-gateway.ps1`), set it up in its dashboard (account, 3–4 provider keys typed there only, the two `aldren-*` chains), then run `dotnet run --project tools\bench -c Release -- gateway --url <its address>` and follow its prompts; `stop-gateway.ps1` at the end.

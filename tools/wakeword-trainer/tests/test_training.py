@@ -38,6 +38,17 @@ def test_speech_end_finds_the_last_loud_frame():
     assert abs(features.speech_end(audio) - 16000) <= 160
 
 
+def test_field_split_holds_out_the_latest_quarter():
+    clips = [f"2026-11-0{d}/trigger-{h:02d}0000.wav" for d in (1, 2) for h in (9, 21)] * 2
+    clips = sorted(set(clips)) + ["2026-11-02/trigger-230000.wav", "2026-11-01/trigger-010000.wav", "2026-11-02/trigger-220000.wav",
+                                  "2026-11-01/trigger-120000.wav"]
+
+    kept, held_out = train.split_field(reversed(clips))
+
+    assert held_out == ["2026-11-02/trigger-220000.wav", "2026-11-02/trigger-230000.wav"]
+    assert len(kept) == 6 and kept == sorted(kept) and kept[0] == "2026-11-01/trigger-010000.wav"
+
+
 def test_split_holds_out_three_takes_per_cue_and_a_third_of_commands(tmp_path):
     lines = [{"file": f"wake-{c}-{t}.wav", "kind": "wake", "text": "ALDREN", "take": t, "cue": f"cue{c}"} for c in range(9) for t in range(9)]
     lines += [{"file": f"command-{i}.wav", "kind": "command", "text": "x", "take": 1, "cue": "en"} for i in range(30)]

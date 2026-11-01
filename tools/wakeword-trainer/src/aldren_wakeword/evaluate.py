@@ -9,7 +9,7 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
 from aldren_wakeword import features, metrics, model
-from aldren_wakeword.train import DATA, FEATURES, SESSION
+from aldren_wakeword.train import DATA, FEATURES, FIELD, SESSION
 
 VALIDATION = DATA / "trainer-data" / "validation_set_features.npy"
 FRAME_SECONDS = 0.08
@@ -134,6 +134,12 @@ def evaluate(model_path: Path, out_dir: Path = Path(r"E:\AldrenData\bench\s4")) 
     lines.append(f"Chosen threshold: {chosen['threshold']} ({chosen['frr']:.1%} false rejects, {chosen['fa_per_hour']:.2f} false accepts/h)"
                  if chosen else "No threshold reaches 0.5 false accepts per hour.")
     lines.append(f"Missed takes at the chosen threshold: {[f for f, s in zip(split['wake_test'], wake) if chosen and s < chosen['threshold']]}")
+    field_split = FEATURES / "field_split.json"
+    if field_split.exists():
+        held_out = json.loads(field_split.read_text(encoding="utf-8"))["test"]
+        field = take_scores(net, extract, FIELD, held_out)
+        lines.append(f"Held-out field false alarms (the newest {len(held_out)}, all of which fired model 3 at 0.9) still firing: "
+                     + ", ".join(f"{int((field >= t).sum())}/{len(field)} at {t}" for t in (0.5, 0.9, 0.99)))
     wake_texts = transcripts(SESSION, split["wake_test"])
     command_texts = transcripts(SESSION, split["command_test"])
     confirmed_wake = np.array([transcript_confirms(t) for t in wake_texts])

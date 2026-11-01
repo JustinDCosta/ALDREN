@@ -15,6 +15,7 @@ DATA = Path(r"E:\AldrenData\voice")
 FEATURES = DATA / "features"
 SESSION = DATA / "recordings" / "2026-11-01"
 ACAV = DATA / "trainer-data" / "openwakeword_features_ACAV100M_2000_hrs_16bit.npy"
+FIELD = DATA / "field"
 
 
 @dataclass
@@ -85,6 +86,30 @@ def prepare(synthetic: Path = DATA / "synthetic", session: Path = SESSION, out: 
     build("noise", [augment(noise[i:i + features.CLIP_SAMPLES]) for i in range(0, len(noise) - features.CLIP_SAMPLES, hop)])
 
 
+def split_field(clips, holdout: float = 0.25) -> tuple[list[str], list[str]]:
+    """The newest quarter of the field false alarms (by day folder, then time) is held out to measure the retrained model on."""
+    ordered = sorted(clips)
+    cut = len(ordered) - max(1, round(len(ordered) * holdout)) if ordered else 0
+    return ordered[:cut], ordered[cut:]
+
+
+def prepare_field(field: Path = FIELD, out: Path = FEATURES, copies: int = 4) -> None:
+    """
+    Windows from the field false alarms. Each clip is the 2 s around a trigger, recorded in the room on the real microphone,
+    so the only augmentation is the level. The held-out clips are listed in field_split.json.
+    """
+    kept, held_out = split_field(p.relative_to(field).as_posix() for p in field.glob("*/trigger-*.wav"))
+    (out / "field_split.json").write_text(json.dumps({"train": kept, "test": held_out}, indent=1), encoding="utf-8")
+    rng = np.random.default_rng(13)
+    clips = []
+    for name in kept:
+        audio = features.read_wav(field / name)[-features.CLIP_SAMPLES:]
+        audio = np.pad(audio, (features.CLIP_SAMPLES - len(audio), 0))
+        clips += [np.clip(audio * 10 ** (rng.uniform(-6, 6) / 20), -1, 1) for _ in range(copies)]
+    np.save(out / "field.npy", features.windows(features.extractor(), np.stack(clips)))
+    print(f"field: {len(kept)} clips kept ({len(clips)} windows), {len(held_out)} held out")
+
+
 VALIDATION = DATA / "trainer-data" / "validation_set_features.npy"
 
 
@@ -119,8 +144,9 @@ def train(positive_dir: Path, negative_features: list[Path], out_model: Path, ep
     val_personal = torch.from_numpy(personal[rng.choice(len(personal), min(1000, len(personal)), replace=False)].astype(np.float32))
     positives = np.concatenate([synth, personal])
     hard_parts = [np.load(p) for p in negative_features if p != ACAV]
-    # The user's own commands are the closest negatives there are (same voice, same microphone): weight them up.
-    hard = np.concatenate([np.repeat(h, 8, axis=0) if "command" in str(p) else h
+    # The user's own commands and the field false alarms are the closest negatives there are (same voice or room, same
+    # microphone): weight them up.
+    hard = np.concatenate([np.repeat(h, 8, axis=0) if "command" in str(p) or "field" in str(p) else h
                            for h, p in zip(hard_parts, [p for p in negative_features if p != ACAV])])
     acav_map = np.load(ACAV, mmap_mode="r")
     rows = np.sort(rng.choice(len(acav_map), 1_000_000, replace=False))
@@ -184,7 +210,7 @@ def train(positive_dir: Path, negative_features: list[Path], out_model: Path, ep
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="aldren-train", description="Prepares windows and trains the wake-word model.")
-    parser.add_argument("step", choices=["prepare", "train"])
+    parser.add_argument("step", choices=["prepare", "prepare-field", "train"])
     parser.add_argument("--personal-only", action="store_true", help="rebuild only the recorded takes' windows")
     parser.add_argument("--epochs", type=int, default=50, help="first-stage length in thousands of steps")
     parser.add_argument("--out", type=Path, default=DATA / "models" / "aldren-wakeword.npz")
@@ -192,7 +218,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.step == "prepare":
         prepare(personal_only=args.personal_only)
         return 0
-    negatives = [FEATURES / n for n in ("near_synth.npy", "command_personal.npy", "noise.npy")] + [ACAV]
+    if args.step == "prepare-field":
+        prepare_field()
+        return 0
+    negatives = [FEATURES / n for n in ("near_synth.npy", "command_personal.npy", "noise.npy", "field.npy") if (FEATURES / n).exists()] + [ACAV]
     report = train(FEATURES, negatives, args.out, args.epochs)
     print(report)
     return 0

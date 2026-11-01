@@ -175,6 +175,7 @@ Tools in `tools/wakeword-trainer` (`aldren-synth`, `aldren-train`, `aldren-eval`
 | 1. Synthetic-heavy, light negative weighting (threshold 0.9) | 18.5% | 26 (full 10.7 h) | 2/10 |
 | 2. openWakeWord's recipe (negative weight to 1,000), checkpoint picked under 0.5/h | 85.2% | 0.0 | 0/10 |
 | 3. As 2, with your takes as half of every positive batch (threshold 0.9) | 7.4% | 36.7 | 5/10 |
+| 4. As 3, plus 540 of your field false alarms as negatives (threshold 0.9) | 3.7% | 12.3 (6.7 at 0.99, where misses rise to 7.4%) | 1/10 |
 | Second stage alone: Parakeet transcript must contain "Aldrin" or close | 44.4% | not measurable offline | 0/10 |
 | Baseline: sherpa-onnx keyword spotter, no training | 100% | | 0/10 |
 
@@ -196,7 +197,18 @@ Findings so far:
 | False wakes with an empty transcript (sound, not speech) | 384 | |
 | CPU | 0.5% | ≤ 2% |
 
-The scores leave no threshold to hide behind: half of the false wakes scored ≥ 0.98, and 102 scored ≥ 0.999. Model 3 learned "your microphone and room" more than "ALDREN". The 704 clips are the real false alarms the plan retrains with, so the retrain doesn't need the full 10 hours first. The remaining field hours then measure the retrained model.
+The scores leave no threshold to hide behind: half of the false wakes scored ≥ 0.98, and 102 scored ≥ 0.999. Model 3 learned "your microphone and room" more than "ALDREN". The 704 clips are the real false alarms the plan retrains with, so the retrain didn't need the full 10 hours first.
+
+**Model 4 (retrained 2026-11-01):** model 3's recipe plus the older 540 field clips (four level variants each, weighted like your commands); the newest 180 were held out.
+
+| Scored offline, the same way for both | Model 3 | Model 4 |
+|---|---|---|
+| Held-out field false alarms firing at 0.9 | 58 of 180 | 6 of 180 (3 at 0.99) |
+| False wakes per hour on other audio, at 0.9 | 36.7 | 12.3 |
+| Your held-out takes missed, at 0.9 | 7.4% | 3.7% |
+| Your held-out commands firing, at 0.9 | 5 of 10 | 1 of 10 |
+
+Model 4 is better on every measure but still ~25× over the false-wake target on general audio. Offline scoring also undercounts: live, model 3 fired on all of these clips, and offline on 58. Only a field run on model 4 gives its real rate.
 
 ### The first recording session was unusable
 The 2026-10-31 session (112 takes on the PD300X) came out squeezed about 2× in time: speech spans were half their normal length and nothing could be transcribed, even though the levels were normal. Through PortAudio's WASAPI path, the PD300X (192 kHz, stereo) delivered one second of audio every 2.07 s, whatever rate or channel count was requested. NAudio reading WASAPI directly received the full 191.8 kHz, and the laptop microphone's 48 kHz arrived correctly, so the device is fine and PortAudio's WASAPI path is at fault. The recorder now captures through MME at 48 kHz (the Windows audio engine converts), times every read, refuses to start if a one-second self-test arrives at the wrong speed, and says "Speak now" only once capture is running. The session has to be redone; the old one is set aside as `2026-10-31-invalid-timing`. For Phase 3: ALDREN's audio service uses NAudio on WASAPI, which delivered correctly, and should time-check its capture the same way.
