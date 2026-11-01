@@ -54,6 +54,25 @@ public static partial class GatewayCommand
         ("I need a 7 minute timer.", "set_timer"), ("Set a 15-minute timer named break.", "set_timer"),
     ];
 
+    private const string PortFile = @"E:\AldrenData\gateway\port.txt";
+
+    /// <summary>
+    /// The gateway's address: <paramref name="url"/> when given (null when it isn't an http URL with a valid port), otherwise the port
+    /// start-gateway.ps1 saved.
+    /// </summary>
+    public static Uri? ResolveUrl(string? url, string? savedPort)
+    {
+        if (url is not null)
+        {
+            return Uri.TryCreate(url.TrimEnd('/') + "/", UriKind.Absolute, out var given) && given.Scheme == Uri.UriSchemeHttp ? given : null;
+        }
+
+        return int.TryParse(savedPort?.Trim(), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var port)
+               && port is > 0 and < 65536
+            ? new Uri($"http://127.0.0.1:{port}/")
+            : null;
+    }
+
     private sealed record Reply(int Status, double Milliseconds, string? RoutedViaHeader, string? Trail, JsonNode? Json)
     {
         public RoutedVia? Via => RoutingHeaders.ParseRoutedVia(RoutedViaHeader);
@@ -64,14 +83,17 @@ public static partial class GatewayCommand
 
     public static async Task<int> RunAsync(string[] args)
     {
-        if (Args.Value(args, "--url") is not { } url)
+        var url = Args.Value(args, "--url");
+        if (ResolveUrl(url, File.Exists(PortFile) ? File.ReadAllText(PortFile) : null) is not { } baseUri)
         {
-            Console.Error.WriteLine("usage: aldren-bench gateway --url http://127.0.0.1:<port> [--checks abcdefghikl] [--idle-minutes 10] " +
+            Console.Error.WriteLine(url is null
+                ? @"Start the gateway first (spikes\S8.Gateway\start-gateway.ps1), or pass --url http://127.0.0.1:<port>."
+                : $"Not a usable URL: {url}. Leave --url out to use the gateway that start-gateway.ps1 started.");
+            Console.Error.WriteLine("usage: aldren-bench gateway [--url http://127.0.0.1:<port>] [--checks abcdefghikl] [--idle-minutes 10] " +
                                     "[--fast-platforms groq,cerebras] [--vision-platforms google,groq] [--gemini gemini-2.5-flash] [--local-model aldren-local] [--tavily]");
             return 2;
         }
 
-        var baseUri = new Uri(url.TrimEnd('/') + "/");
         var checks = (Args.Value(args, "--checks") ?? "abcdefghikl").ToHashSet();
         if (Args.Flag(args, "--tavily"))
         {
@@ -83,7 +105,7 @@ public static partial class GatewayCommand
         var pid = TcpTable.All().FirstOrDefault(r => r.State == "LISTEN" && r.Local.Port == baseUri.Port).ProcessId;
         if (pid == 0)
         {
-            Console.Error.WriteLine($"Nothing is listening on port {baseUri.Port}.");
+            Console.Error.WriteLine($@"Nothing is listening on port {baseUri.Port}: start the gateway first (spikes\S8.Gateway\start-gateway.ps1).");
             return 1;
         }
 

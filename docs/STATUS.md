@@ -56,7 +56,7 @@ Labels: **Planned** · **In progress** · **Implemented** (code written, not yet
 
 ## Waiting on you
 - S3: a short live test on each microphone, unplugging the PD300X mid-capture once, and the Bluetooth headset check.
-- S4: restart the field listener on model 4 (Ctrl+C the current one, then `uv.ps1 run aldren-listen --model E:\AldrenData\voice\models\aldren-wakeword-4.npz --threshold 0.95`) and leave it on for a few hours of normal use.
+- S4: leave the model 4 field listener running (since 2026-11-01 16:16, in the terminal tab "wake-word field test (model 4)") for a few hours of normal use.
 - S6: the CDP part only. Close the test-profile Chrome window, then run `CdpAttach.exe profile`. Turn remote debugging on at `chrome://inspect/#remote-debugging`, run `CdpAttach.exe attach` and approve Chrome's prompt, then turn it off again.
 - S7: after 2 reboots on each adapter, `S7.Network.exe snapshot` (skip if done: reboots don't show in the watch log).
-- S8, about 30 minutes: start the gateway (`spikes\S8.Gateway\start-gateway.ps1`), set it up in its dashboard (account, 3–4 provider keys typed there only, the two `aldren-*` chains), then run `dotnet run --project tools\bench -c Release -- gateway --url <its address>` and follow its prompts; `stop-gateway.ps1` at the end.
+- S8, about 30 minutes: start the gateway (`spikes\S8.Gateway\start-gateway.ps1`), set it up in its dashboard (account, 3–4 provider keys typed there only, the two `aldren-*` chains), then run `dotnet run --project tools\bench -c Release -- gateway` (it finds the running gateway itself) and follow its prompts; `stop-gateway.ps1` at the end.

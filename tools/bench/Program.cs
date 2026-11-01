@@ -13,6 +13,6 @@ static int Usage()
     Console.Error.WriteLine("usage: aldren-bench <command> [options]");
     Console.Error.WriteLine("  smoke --model <path.gguf> [--ctx 4096]                       load a model and time one short reply");
     Console.Error.WriteLine("  models [--only a,b] [--skip-switch] [--allow-battery]         benchmark the Phase 0 candidate models");
-    Console.Error.WriteLine("  gateway --url http://127.0.0.1:<port> [--checks abcdefghikl]  check a running FreeLLMAPI gateway (S8)");
+    Console.Error.WriteLine("  gateway [--url http://127.0.0.1:<port>] [--checks abcdefghikl] check a running FreeLLMAPI gateway (S8)");
     return 2;
 }
