@@ -15,7 +15,7 @@ from pathlib import Path
 
 import numpy as np
 
-from aldren_wakeword import features, model
+from aldren_wakeword import features, metrics, model
 from aldren_wakeword.record import DEFAULT_HOST_API, delivery_rate_ok, pick_device
 
 BLOCK = 1280  # 80 ms at 16 kHz, one embedding frame
@@ -85,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
                     score = float(net(extract.get_features(features.WINDOW))[0])
                     if score >= args.threshold:
                         triggers += 1
-                        cooldown = 25  # 2 s
+                        cooldown = metrics.LISTENER_COOLDOWN_FRAMES
                         stamp = datetime.datetime.now()
                         pending.append((6, f"trigger-{stamp:%H%M%S}.wav"))  # 0.5 s more audio, then save
                         write({"event": "trigger", "time": stamp.isoformat(timespec="seconds"), "score": round(score, 3)})

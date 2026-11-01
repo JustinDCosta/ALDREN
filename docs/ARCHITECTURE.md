@@ -202,7 +202,7 @@ Decision record: [ADR-0004](decisions/0004-local-inference.md).
 | Gaming / battery fallback (conversation only) | Qwen3.5-0.8B Q4_K_M | CPU | ~1 GB RAM *(est.)* |
 | Embeddings (memory, intents) | EmbeddingGemma-300M | CPU (ONNX) | ~0.3 GB RAM *(est.)* |
 
-Benchmarked and not chosen: Qwen3.5-2B, Gemma 4 E2B, Granite 4.2 3B and LFM2.5-1.2B ([results](benchmarks/phase0.md#s1-local-models)). GUI-grounding specialists (for example Step-GUI-4B) only if Qwen3.5's grounding proves insufficient. S5 found it insufficient on dense windows, and [ADR-0013](decisions/0013-perception-names-first.md) (proposed) evaluates one in Phase 5.
+Benchmarked and not chosen: Qwen3.5-2B, Gemma 4 E2B, Granite 4.2 3B and LFM2.5-1.2B ([results](benchmarks/phase0.md#s1-local-models)). GUI-grounding specialists (for example Step-GUI-4B) only if Qwen3.5's grounding proves insufficient. S5 found it insufficient on dense windows, so Phase 5 evaluates one ([ADR-0013](decisions/0013-perception-names-first.md)).
 
 **VRAM budget:** ~770 MiB desktop + ~300–450 MiB CUDA runtime leaves ~4.9–5.1 GB for weights and KV cache, less while a game, OBS or video playback is running.
 
@@ -314,18 +314,19 @@ Targets: ≤0.5 false wakes per hour and ≥95% detection at desk distance, meas
 
 **Perception ladder** (cheapest first; stop as soon as there is enough):
 
-| Level | Source | Cost *(est.)* | Gives |
+| Level | Source | Cost | Gives |
 |---|---|---|---|
-| 1 | Win32 and shell metadata | <5 ms | Active app, window titles, monitors |
-| 2 | UI Automation tree (FlaUI/UIA3) | 50–500 ms | Controls: names, roles, states, values, bounds, patterns |
-| 3 | Windows Graphics Capture + Windows OCR (EN/FR) | 100–300 ms | Text where UIA sees nothing |
-| 4 | Numbered overlay | +50 ms | Boxes over UIA/OCR elements so the model answers "#14", not pixel coordinates |
-| 5 | Local vision model | 1.5–4 s | Layouts, icons, "what am I looking at?" |
-| 6 | Cloud vision | — | Only with per-request consent (§8.4) |
+| 1 | Win32 and shell metadata | <5 ms *(est.)* | Active app, window titles, monitors |
+| 2 | UI Automation tree (FlaUI/UIA3), scoped to the focused pane or the region in question | 325–648 ms p90 per window in S5 (whole windows) | Controls: names, roles, states, values, bounds, patterns |
+| 3 | Name matching, in code | a few ms *(est.)* | The control a request names, matched against UIA names, automation IDs and roles, then OCR text where UIA has none. A single match needs no model |
+| 4 | Windows Graphics Capture + Windows OCR | ~120 ms p90 (S5) | Text where UIA sees nothing; reads about two thirds of UI labels |
+| 5 | Numbered overlay over a short candidate list | +50 ms *(est.)* | Boxes over the few candidates left (about eight at most, measured in Phase 5), so the model answers "#3", not pixel coordinates |
+| 6 | Local vision model | ~1 s per question on a small dialog, 2–5 s on a real window (S1, S5) | Layouts, icons, "what am I looking at?", and the choice among candidates |
+| 7 | Cloud vision | — | Only with per-request consent (§8.4) |
 
-This hybrid follows the approach of Microsoft Research's UFO² Windows agent: UIA first, visual grounding for the gaps, and UIA checks before acting.
-
-Phase 0 (S5) measured this ladder on 30 of your windows: UI Automation took 478 ms p90, Windows OCR read 67% of the drawn labels, and the 4B model picked the right numbered box only 24% of the time among up to 60 ([results](benchmarks/phase0.md#s5-screen-perception)). [ADR-0013](decisions/0013-perception-names-first.md) proposes finding controls by name first and showing vision only a few candidates; this section changes once you approve it.
+This hybrid follows the approach of Microsoft Research's UFO² Windows agent: UIA first, visual grounding for the gaps, and UIA checks before acting. Controls are found by name first and vision only chooses among a few candidates ([ADR-0013](decisions/0013-perception-names-first.md)): in Phase 0 (S5) the 4B model picked the right box only 24% of the time among up to 60 on your real windows ([results](benchmarks/phase0.md#s5-screen-perception)).
+- **Apps without an accessibility tree** (Discord, Steam and Epic exposed no controls in S5): Phase 5 first checks whether they expose one when asked; otherwise vision works on the raw screenshot, with confirmation before acting.
+- **Evaluated in Phase 5,** each download with your approval first: the 9B deep tier on the candidate list, a GUI-grounding model swapped in like the 9B, and a stronger OCR engine.
 
 - **Capture:** the Windows capture border stays visible by default as a "looking" indicator; ALDREN's own windows are excluded from capture.
 - **Actions** (typed): launch, focus or close an app; move, resize or snap a window; apply a layout; invoke an element; set text; select an item; scroll; allowlisted keyboard shortcuts; file operations; screenshot. Each is validated, permission-checked, confirmed when required, executed with a timeout and verified by re-observing. Elements are referenced by IDs from the latest snapshot; stale IDs are rejected. Pixel clicks are a flagged last resort after a fresh screenshot check, disabled in sensitive apps.
@@ -349,7 +350,7 @@ Safety: page content is untrusted; per-site levels (read, interact, forms); conf
 
 ## 13. User interface
 
-Decision record: [ADR-0002](decisions/0002-winui3-ui.md). WinUI 3 (Windows App SDK 2.x), with WPF as the fallback after the Phase 0 spike.
+Decision record: [ADR-0002](decisions/0002-winui3-ui.md). WinUI 3 (Windows App SDK 2.x), confirmed by the Phase 0 spike (S2); the WPF fallback isn't needed.
 
 **Island:**
 - A near-black pill (like the real Dynamic Island) with a 1 px highlight and an accent light ("arc-reactor" cyan, configurable).

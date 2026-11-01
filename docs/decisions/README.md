@@ -16,6 +16,6 @@ Each record explains one major decision: its context, the decision itself, the a
 | [0010](0010-home-away-detection.md) | Home detection by network identity, not Wi-Fi name | Accepted; confirmed by Phase 0 (S7), Away after ~3 s; reboot checks before Phase 4 |
 | [0011](0011-supertonic-voice-english-only.md) | Supertonic 3 voice on the CPU; English-only speech | Accepted (2026-11-01); a more natural voice to evaluate in Phase 3 |
 | [0012](0012-gateway-go-chains-only.md) | Keep FreeLLMAPI after S8; curated chains only, ALDREN's providers only, short deadlines | Accepted (2026-11-01); overhead and failover measured before Phase 6 |
-| [0013](0013-perception-names-first.md) | Find controls by name first; vision chooses among a few candidates | Proposed (2026-11-01); awaiting your approval |
+| [0013](0013-perception-names-first.md) | Find controls by name first; vision chooses among a few candidates | Accepted (2026-11-01) |
 
 Template for new records: **Status** (with date) · **Context** · **Decision** · **Alternatives considered** · **Consequences** · **Revisit if**.

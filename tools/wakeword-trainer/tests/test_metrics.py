@@ -14,8 +14,12 @@ def test_fa_per_hour_merges_consecutive_frames():
     assert metrics.false_accepts_per_hour(scores, threshold=0.5, hours=1.0, refractory_frames=20) == 2.0
 
 
-def test_fa_per_hour_counts_a_long_activation_once():
+def test_fa_per_hour_fires_again_through_a_long_activation_like_the_listener():
     scores = np.zeros(1000)
-    scores[100:160] = 0.9  # longer than the refractory window, but one continuous activation
+    scores[100:160] = 0.9  # the live listener re-arms after each cooldown: triggers at 100, 120 and 140
 
-    assert metrics.false_accepts_per_hour(scores, threshold=0.5, hours=0.5, refractory_frames=20) == 2.0
+    assert metrics.false_accepts_per_hour(scores, threshold=0.5, hours=0.5, refractory_frames=20) == 6.0
+
+
+def test_listener_cooldown_is_the_default_refractory():
+    assert metrics.LISTENER_COOLDOWN_FRAMES == 25

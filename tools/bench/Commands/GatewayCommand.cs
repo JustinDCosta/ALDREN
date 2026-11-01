@@ -90,7 +90,7 @@ public static partial class GatewayCommand
                 ? @"Start the gateway first (spikes\S8.Gateway\start-gateway.ps1), or pass --url http://127.0.0.1:<port>."
                 : $"Not a usable URL: {url}. Leave --url out to use the gateway that start-gateway.ps1 started.");
             Console.Error.WriteLine("usage: aldren-bench gateway [--url http://127.0.0.1:<port>] [--checks abcdefghikl] [--idle-minutes 10] " +
-                                    "[--fast-platforms groq,cerebras] [--vision-platforms google,groq] [--gemini gemini-2.5-flash] [--local-model aldren-local] [--tavily]");
+                                    "[--fast-models groq/gpt-oss-120b,...] [--vision-models google/gemini-2.5-flash,...] [--gemini gemini-2.5-flash] [--local-model aldren-local] [--tavily]");
             return 2;
         }
 
@@ -102,8 +102,9 @@ public static partial class GatewayCommand
 
         pace = TimeSpan.FromMilliseconds(int.Parse(Args.Value(args, "--pace-ms") ?? "0", System.Globalization.CultureInfo.InvariantCulture));
         pacedGateway = baseUri;
-        var fast = Platforms(Args.Value(args, "--fast-platforms") ?? "groq,cerebras");
-        var vision = Platforms(Args.Value(args, "--vision-platforms") ?? "google,groq");
+        // Defaults: the chains as configured on 2026-11-01 (ADR-0012). Membership is checked per model, not per platform.
+        var fast = RoutingHeaders.Chain(Args.Value(args, "--fast-models") ?? "groq/gpt-oss-120b,groq/gpt-oss-20b,groq/qwen3.8-27b");
+        var vision = RoutingHeaders.Chain(Args.Value(args, "--vision-models") ?? "google/gemini-2.5-flash,google/gemini-flash-latest,google/gemini-flash-lite-latest");
         var pid = TcpTable.All().FirstOrDefault(r => r.State == "LISTEN" && r.Local.Port == baseUri.Port).ProcessId;
         if (pid == 0)
         {
@@ -171,13 +172,13 @@ public static partial class GatewayCommand
             }
 
             var served = routing.Where(r => r.Reply.Status == 200).ToList();
-            var inChain = served.Count(r => r.Reply.Via is { } via && RoutingHeaders.IsAllowed(via, r.Chain == "auto:aldren-vision" ? vision : fast));
+            var inChain = served.Count(r => r.Reply.Via is { } via && RoutingHeaders.IsInChain(via, r.Chain == "auto:aldren-vision" ? vision : fast));
             Line(report, $"- X-Routed-Via present and inside the requested chain on {inChain}/{served.Count} served chain requests (target: all)");
         }
 
         if (checks.Contains('k'))
         {
-            await Guarded(report, 'k', () => DescribeRemotesAsync(report, idleRemotes, burstRemotes, fast.Concat(vision)));
+            await Guarded(report, 'k', () => DescribeRemotesAsync(report, idleRemotes, burstRemotes, RoutingHeaders.Platforms(fast.Concat(vision))));
         }
 
         Directory.CreateDirectory(Path.GetDirectoryName(ResultsFile)!);
@@ -267,7 +268,7 @@ public static partial class GatewayCommand
             routing.Add(("auto:aldren-fast", reply));
         }
 
-        var inChain = replies.Count(r => r.Status == 200 && r.Via is { } via && RoutingHeaders.IsAllowed(via, fast));
+        var inChain = replies.Count(r => r.Status == 200 && r.Via is { } via && RoutingHeaders.IsInChain(via, fast));
         var hops = replies.SelectMany(r => RoutingHeaders.ParseTrail(r.Trail)).Select(h => $"{h.Platform}/{h.Model} {h.Reason}").Distinct().ToList();
         Line(report, $"- (e) failover with the top key disabled: {inChain}/10 served inside aldren-fast (target 10/10), served by " +
                      $"{string.Join(", ", replies.Select(r => r.RoutedViaHeader ?? $"none ({r.Status})").Distinct())}; failed hops in the trail: " +
@@ -365,7 +366,7 @@ public static partial class GatewayCommand
             var reply = await ChatAsync(api, Body("auto:aldren-vision", Picture()), ct);
             routing.Add(("auto:aldren-vision", reply));
             vias.Add(reply.RoutedViaHeader ?? $"error {reply.Status}");
-            if (reply.Status == 200 && reply.Via is { } via && RoutingHeaders.IsAllowed(via, vision)
+            if (reply.Status == 200 && reply.Via is { } via && RoutingHeaders.IsInChain(via, vision)
                 && reply.Content.Contains("red", StringComparison.OrdinalIgnoreCase))
             {
                 correct++;
@@ -375,7 +376,7 @@ public static partial class GatewayCommand
         var text = await ChatAsync(api, Body("auto:aldren-fast", Picture()), ct);
         // A text chain may hold a vision-capable model; what must never happen is an answer from outside the chain.
         var outcome = text.Status == 200
-            ? text.Via is { } v && RoutingHeaders.IsAllowed(v, fast)
+            ? text.Via is { } v && RoutingHeaders.IsInChain(v, fast)
                 ? $"served inside the chain by {text.RoutedViaHeader}, so the chain has a vision-capable model"
                 : $"FAIL: served outside the chain ({text.RoutedViaHeader ?? "no X-Routed-Via"})"
             : text.Status == 422 ? "refused with 422 (pass)" : "refused, but not with 422";
@@ -407,13 +408,18 @@ public static partial class GatewayCommand
     private static async Task CheckCanaryAsync(StringBuilder report, HttpClient api, List<(string, Reply)> routing, CancellationToken ct)
     {
         var canary = $"ALDREN-CANARY-{Guid.NewGuid():N}";
+        var sent = DateTime.UtcNow;
         var reply = await ChatAsync(api, Body("auto:aldren-fast", $"Repeat this token exactly and nothing else: {canary}"), ct);
         routing.Add(("auto:aldren-fast", reply));
         await Task.Delay(3000, ct); // let the gateway finish its writes
-        var needle = Encoding.UTF8.GetBytes(canary);
-        var found = new[] { DbPath, DbPath + "-wal", DbPath + "-shm", LogPath }.Where(f => Contains(f, needle)).Select(Path.GetFileName).ToList();
-        Line(report, $"- (l) canary sent through auto:aldren-fast ({reply.Status}, echoed: {reply.Content.Contains(canary, StringComparison.Ordinal)}): " +
-                     $"{(found.Count == 0 ? "absent from the database and the log (pass)" : $"FOUND in {string.Join(", ", found)} (fail)")}");
+        var scan = CanaryScan.Scan(DbPath, [LogPath], Encoding.UTF8.GetBytes(canary), sent);
+        var verdict = scan switch
+        {
+            { Passed: true } => $"absent from the database and the log, {scan.BytesScanned:N0} bytes scanned (pass)",
+            { FoundIn.Count: > 0 } => $"FOUND in {string.Join(", ", scan.FoundIn)} (fail)",
+            _ => $"not verified: {string.Join("; ", scan.Problems)} (fail)",
+        };
+        Line(report, $"- (l) canary sent through auto:aldren-fast ({reply.Status}, echoed: {reply.Content.Contains(canary, StringComparison.Ordinal)}): {verdict}");
     }
 
     private static async Task DescribeRemotesAsync(StringBuilder report, HashSet<IPEndPoint> idle, HashSet<IPEndPoint> burst, IEnumerable<string> platforms)
@@ -502,21 +508,6 @@ public static partial class GatewayCommand
 
     private static string? Header(HttpResponseMessage response, string name) =>
         response.Headers.TryGetValues(name, out var values) ? values.FirstOrDefault() : null;
-
-    private static HashSet<string> Platforms(string list) => [.. list.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
-
-    private static bool Contains(string file, byte[] needle)
-    {
-        if (!File.Exists(file))
-        {
-            return false;
-        }
-
-        using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-        using var copy = new MemoryStream();
-        stream.CopyTo(copy);
-        return copy.GetBuffer().AsSpan(0, (int)copy.Length).IndexOf(needle) >= 0;
-    }
 
     private static string Shorten(string text) => text.Length > 120 ? text[..120] + "…" : text;
 

@@ -39,4 +39,14 @@ public static class RoutingHeaders
     }
 
     public static bool IsAllowed(RoutedVia via, IReadOnlySet<string> allowedPlatforms) => allowedPlatforms.Contains(via.Platform);
+
+    /// <summary>A chain as "platform/model" entries, from a comma-separated list.</summary>
+    public static IReadOnlySet<string> Chain(string list) =>
+        list.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet(StringComparer.Ordinal);
+
+    /// <summary>True only when this exact model, on this platform, is one of the chain's entries.</summary>
+    public static bool IsInChain(RoutedVia via, IReadOnlySet<string> chain) => chain.Contains($"{via.Platform}/{via.Model}");
+
+    public static IReadOnlySet<string> Platforms(IEnumerable<string> chainEntries) =>
+        chainEntries.Select(e => e[..Math.Max(e.IndexOf('/'), 0)]).Where(p => p.Length > 0).ToHashSet(StringComparer.Ordinal);
 }

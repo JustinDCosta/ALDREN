@@ -168,7 +168,7 @@ def train(positive_dir: Path, negative_features: list[Path], out_model: Path, ep
                                 for i in range(0, len(selection), 50_000)]).numpy()
         from aldren_wakeword.metrics import false_accepts_per_hour
 
-        fa = false_accepts_per_hour(scores, 0.5, selection_hours, 20)
+        fa = false_accepts_per_hour(scores, 0.5, selection_hours)
         net.train()
         if fa <= 0.5 and (best is None or recall > best[0]):
             best = (recall, -fa, copy.deepcopy(net.state_dict()))

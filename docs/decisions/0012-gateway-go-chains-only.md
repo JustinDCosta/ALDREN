@@ -7,7 +7,7 @@
 S8 ran FreeLLMAPI v0.16.14 with ALDREN's hardening on the target laptop ([results](../benchmarks/phase0.md#s8-freellmapi-gateway)):
 - **Configured as ALDREN would use it** (the two `aldren-*` chains, keys enabled only for Google, Groq and OpenRouter):
   - every answered tool call was valid (38/38), and schema output was 20/20;
-  - 63/63 answers came from inside the requested chain;
+  - 63/63 answers came from a provider in the requested chain (the model itself wasn't checked then; the bench checks it now);
   - a canary sent in a prompt was never stored;
   - only those three providers were contacted;
   - it listened on loopback only and refused a foreign `Host`.

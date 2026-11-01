@@ -13,7 +13,6 @@ from aldren_wakeword.train import DATA, FEATURES, FIELD, SESSION
 
 VALIDATION = DATA / "trainer-data" / "validation_set_features.npy"
 FRAME_SECONDS = 0.08
-REFRACTORY_FRAMES = 20  # 1.6 s: activations closer together count once
 THRESHOLDS = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 0.99]
 
 
@@ -121,7 +120,7 @@ def evaluate(model_path: Path, out_dir: Path = Path(r"E:\AldrenData\bench\s4")) 
     rows = []
     for t in THRESHOLDS:
         rows.append({"threshold": t, "frr": metrics.false_reject_rate(wake, t),
-                     "fa_per_hour": metrics.false_accepts_per_hour(stream, t, hours, REFRACTORY_FRAMES),
+                     "fa_per_hour": metrics.false_accepts_per_hour(stream, t, hours),
                      "own_commands_triggering": int((commands >= t).sum())})
     eligible = [r for r in rows if r["fa_per_hour"] <= 0.5]
     chosen = min(eligible, key=lambda r: (r["frr"], r["threshold"])) if eligible else None

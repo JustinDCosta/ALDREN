@@ -8,14 +8,14 @@ Phase 0 ran on 2026-10-31 and 2026-11-01. S1, S2, S5 and S8 answered their quest
 
 | Spike | Against the targets | Decision |
 |---|---|---|
-| S1 Local models | Qwen3.5-4B: first token 114 ms (target ≤ 400), 74.5 tokens/s (≥ 30), 3,856 MiB of VRAM at 8K (≤ 4.6 GB), routing 95% (≥ 90%), valid tool calls 96.7% (≥ 95%), screenshot answer 0.96 s (≤ 4 s). Missed: one injection case of 15 called a tool, and the switch to the 9B takes 4.4 s (≤ 4 s) | [ADR-0004](../decisions/0004-local-inference.md) confirmed: the 4B resident, the 9B by restart, Qwen3.5-0.8B on the CPU for conversation only |
+| S1 Local models | Qwen3.5-4B: first token 114 ms (target ≤ 400), 74.5 tokens/s (≥ 30), 3,856 MiB of VRAM at 8K (≤ 4.6 GB), routing 95% (≥ 90%), valid tool calls 96.7% (≥ 95%), screenshot answer 0.96 s on a small dialog (≤ 4 s; 2–5 s on your real windows in S5). Missed: one injection case of 15 called a tool, and the switch to the 9B takes 4.4 s (≤ 4 s) | [ADR-0004](../decisions/0004-local-inference.md) confirmed: the 4B resident, the 9B by restart, Qwen3.5-0.8B on the CPU for conversation only |
 | S2 Island overlay | All 8 checks pass on both screens | [ADR-0002](../decisions/0002-winui3-ui.md) confirmed: WinUI 3, no WPF fallback |
 | S3 Voice chain | Recognition 5.4% word error rate (≤ 10%) in 137 ms (≤ 400 ms); first audio 213 ms with Supertonic 3 (≤ 300 ms); end of speech + recognition + first audio ~0.75 s (≤ 1.1 s). Left: the live microphone checks | [ADR-0011](../decisions/0011-supertonic-voice-english-only.md): Supertonic 3, English only; Parakeet and Silero confirmed ([ADR-0005](../decisions/0005-voice-stack.md)) |
 | S4 Wake word | Model 4: 3.7% of your held-out takes missed (≤ 5%), but ~16 false wakes per hour of your normal use (≤ 0.5), down from ~217 for model 3; 0.5% CPU (≤ 2%) | ADR-0005's approach stays while training continues; it must reach the target, or be revisited, before Phase 3 relies on it |
-| S5 Perception | UI Automation 478 ms p90 (≤ 500 ms; Explorer 648 ms); Windows OCR reads 67% of drawn labels (≥ 90%); the 4B picks the right numbered box 24% of the time (≥ 80%); 3.2 s p50 / 4.9 s p90 per question (≤ 4 s) | [ADR-0013](../decisions/0013-perception-names-first.md), proposed: find controls by name first, and give vision only a few candidates |
+| S5 Perception | UI Automation 478 ms p90 (≤ 500 ms; Explorer 648 ms); Windows OCR reads 67% of drawn labels (≥ 90%); the 4B picks the right numbered box 24% of the time (≥ 80%); 3.2 s p50 / 4.9 s p90 per question (≤ 4 s) | [ADR-0013](../decisions/0013-perception-names-first.md), accepted: find controls by name first, and give vision only a few candidates |
 | S6 Browser | Ping through Chrome 0.3 ms p90 (≤ 50 ms); read, click and fill work; injected instructions inert; passwords stay on the page. Left: the consent-based attach | [ADR-0009](../decisions/0009-browser-automation.md) confirmed for the extension and the separate profile |
 | S7 Network identity | Home 1.6–1.7 s after a Wi-Fi reconnect (≤ 2 s); one fingerprint covers Ethernet and Wi-Fi; a phone hotspot reads Away. Left: the reboot checks | [ADR-0010](../decisions/0010-home-away-detection.md) confirmed, with Away announced only after ~3 s |
-| S8 FreeLLMAPI | Tool calls 38/38 valid when answered (≥ 95%), schema output 20/20, 63/63 answers inside the requested chain, canary never stored, only the configured providers contacted; memory 101–103 MB (≤ 100 MB). Not measured: overhead and failover | [ADR-0012](../decisions/0012-gateway-go-chains-only.md): go with v0.16.14, curated chains only |
+| S8 FreeLLMAPI | Tool calls 38/38 valid when answered (≥ 95%), schema output 20/20, 63/63 answers from a provider in the requested chain (model not checked then), canary never stored, only the configured providers contacted; memory 101–103 MB (≤ 100 MB). Not measured: overhead and failover | [ADR-0012](../decisions/0012-gateway-go-chains-only.md): go with v0.16.14, curated chains only |
 
 Carried forward:
 - **Phase 2:** the llama-server client retries a request once when the server drops a keep-alive connection; the 15 injection cases become a regression test; the persona prompt needs shorter replies.
@@ -102,7 +102,7 @@ Restoring a saved prompt cache after a reload brought the 4B's first token from 
 | Routing ≥ 90% | 95% (38/40) | Met |
 | Valid tool calls ≥ 95% | 96.7% (29/30) | Met |
 | No tool call on injection cases | 1 of 15 called a tool | Not met |
-| Screenshot answer ≤ 4 s | 0.96 s with the projector on the GPU (6.3 s on the CPU) | Met on the GPU |
+| Screenshot answer ≤ 4 s | 0.96 s with the projector on the GPU (6.3 s on the CPU), on a 900×420 test dialog; on your real windows S5 measured 3.2 s p50, 4.9 s p90 | Met on the small dialog; p90 missed on real windows |
 | Switch to the 9B ≤ 4 s | 4.1 s bare, 4.4 s with the system prompt | Not met, by 0.1–0.4 s |
 
 ### Decisions
@@ -204,6 +204,8 @@ Tools in `tools/wakeword-trainer` (`aldren-synth`, `aldren-train`, `aldren-eval`
 | Baseline: sherpa-onnx keyword spotter, no training | 100% | | 0/10 |
 
 Targets: ≤ 5% misses and ≤ 0.5 false wakes per hour. The field listener uses 0.65% CPU (target ≤ 2%).
+
+The offline false-wake rates in this section (and the threshold and checkpoint choices made with them) merged a long run of activations into one, while the live listener fires again every 2 s through the same sound. They undercount compared with live use; only the field runs below are live counts. Since the Phase 0 review, the trainer counts the way the listener fires.
 
 Findings so far:
 - From synthetic speech plus 54 real takes, one network trades misses for false wakes but doesn't reach both targets: it either learns Piper's voice (and misses yours) or learns your voice (and fires on you saying anything).
@@ -418,7 +420,7 @@ The dashboard's model table only saves after **Save changes**. The first attempt
 | (i) `google_search` on `gemini-2.5-flash` | answered by Google itself, no source links | |
 | (k) Outbound | Groq, Google and OpenRouter (`104.18.2.115` is openrouter.ai); nothing else, nothing while idle | configured providers only |
 | (l) Canary | echoed by the model; absent from the database and the log | absent |
-| `X-Routed-Via` | inside the requested chain on 63/63 answers | every answer |
+| `X-Routed-Via` | a provider of the requested chain on 63/63 answers (the model wasn't compared with the chain; the bench does that now) | every answer |
 
 Also seen:
 - **Hung requests aren't cut short.** One Gemini request hung for the full 60 s provider timeout, then returned 502 without failing over, because the 8 s failover budget was already spent. ALDREN needs its own short client-side deadlines (as ADR-0007 plans) and a shorter `PROVIDER_TIMEOUT_GOOGLE`.
@@ -428,7 +430,7 @@ Also seen:
 
 ADR-0007's revisit triggers are unacceptable overhead, unreliable tool calling, a security problem, or an unmaintained project.
 - **Tool calling is reliable:** 38 of 38 answered tool calls valid, 20 of 20 schema outputs.
-- **Security holds:** loopback only, foreign Host refused, the canary was never stored, 63 of 63 answers from inside the requested chain, and only configured providers contacted. The one real risk is configuration, not a hole in the gateway: a model name can resolve to a reseller.
+- **Security holds:** loopback only, foreign Host refused, the canary was never stored, 63 of 63 answers from a provider in the requested chain, and only configured providers contacted. The one real risk is configuration, not a hole in the gateway: a model name can resolve to a reseller.
 - **Still open:** overhead (d) and failover (e) weren't measured, and memory is 1–3 MB over target.
 
 **Decision: go** ([ADR-0012](../decisions/0012-gateway-go-chains-only.md), 2026-11-01; you left the call to the project), on four conditions:

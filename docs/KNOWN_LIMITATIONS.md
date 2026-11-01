@@ -13,7 +13,7 @@ These are deliberate, honest limits of the design on this hardware. Update this 
 Measured in Phase 0 unless marked as an estimate:
 - **Voice:** about 0.85–0.9 s from your last word to ALDREN's first sound with the model warm: 400 ms to be sure you've stopped (recognition, started at 250 ms, finishes at about the same moment), ~0.25 s for the model's first sentence (estimated from its speed) and ~0.21 s for the voice. A short pre-made acknowledgement can start at ~0.4 s. The whole chain is first timed end to end in Phase 3.
 - **Text:** the resident 4B starts answering ~0.11 s after a request with its prompt cached and writes ~75 tokens/s. A question that needs the 9B first waits ~4.4 s for the switch.
-- **Screen:** a question about a screenshot takes ~1 s. Finding a control by vision on a real window takes 3–5 s and was right only about one time in four, so ALDREN relies on UI Automation's names wherever it can ([ADR-0013](decisions/0013-perception-names-first.md), proposed).
+- **Screen:** a question about a screenshot took ~1 s on a small dialog but 2–5 s on your real windows (1.8–3.4 s scaled to 1280 px). Finding a control by vision on a real window takes 3–5 s and was right only about one time in four, so ALDREN relies on UI Automation's names wherever it can ([ADR-0013](decisions/0013-perception-names-first.md)).
 - **Research:** 5–15 s is still an estimate; Phase 6 measures it.
 - On the eval set the 4B picks the right brain 95% of the time and makes a valid tool call 97% of the time, so roughly one request in twenty to thirty needs a retry or a correction.
 - A 4B model should handle 1–5-step tasks when UI Automation exposes the controls (Phase 5 measures this). Long autonomous tasks across several apps will be unreliable locally.
@@ -30,7 +30,7 @@ Measured in Phase 0 unless marked as an estimate:
 
 ## Windows control
 - ALDREN cannot control elevated (admin) windows or UAC prompts, by design.
-- Apps with poor accessibility data fall back to OCR and vision, which are slower and much less precise. In Phase 0, Discord, Steam and Epic exposed no controls to UI Automation (VS Code and Claude only 4), Windows OCR read about two thirds of the UI labels, and the 4B model found a named control among dozens about one time in four. Phase 5 works on this ([ADR-0013](decisions/0013-perception-names-first.md), proposed).
+- Apps with poor accessibility data fall back to OCR and vision, which are slower and much less precise. In Phase 0, Discord, Steam and Epic exposed no controls to UI Automation (VS Code and Claude only 4), Windows OCR read about two thirds of the UI labels, and the 4B model found a named control among dozens about one time in four. Phase 5 works on this ([ADR-0013](decisions/0013-perception-names-first.md)).
 - ALDREN never sends input to games (anti-cheat such as Riot Vanguard could flag it).
 
 ## Focus mode

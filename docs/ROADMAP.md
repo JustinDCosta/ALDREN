@@ -53,7 +53,7 @@ Needs from you: a Google Cloud project with a Desktop OAuth client (a step-by-st
 Exit: reminders survive a reboot; date, DST and relative-date tests pass; calendar create, modify and delete (with confirmation) work on your account; the greeting plays only on the home network (tested by switching networks); memories can be inspected and deleted.
 
 ## Phase 5: Action Brain
-Deliverables: window manager with named layouts per monitor configuration; file service (search index, recents, Downloads, VS Code recents, document readers, duplicates, Recycle Bin deletes, undo journal, dry-run previews); perception (UIA snapshot, capture, Windows OCR, numbered overlay, local vision); resolution of "that", "this" and "the second one"; element actions with post-condition checks; clipboard intelligence.
+Deliverables: window manager with named layouts per monitor configuration; file service (search index, recents, Downloads, VS Code recents, document readers, duplicates, Recycle Bin deletes, undo journal, dry-run previews); perception (scoped UIA snapshots, name-first control resolution, capture, Windows OCR, a numbered overlay over a short candidate list, local vision; [ADR-0013](decisions/0013-perception-names-first.md)), starting with the candidate-list experiment, then evaluations of a GUI-grounding model and a stronger OCR engine; resolution of "that", "this" and "the second one"; element actions with post-condition checks; clipboard intelligence.
 
 Exit: the example commands from the brief pass a 50-task local benchmark (targets set after Phase 0); every action is logged; destructive actions are gated.
 

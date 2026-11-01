@@ -1,6 +1,6 @@
 # ADR-0013: Find controls by name first; vision chooses among a few candidates
 
-- **Status:** Proposed (2026-11-01); awaiting your approval. Once accepted, it changes the perception ladder in ARCHITECTURE.md §11.
+- **Status:** Accepted (2026-11-01). The perception ladder in ARCHITECTURE.md §11 now follows it.
 - **Refines:** the numbered-overlay level of the perception ladder (ARCHITECTURE.md §11) and the note on GUI-grounding models in §7.
 
 ## Context
@@ -11,7 +11,7 @@ Phase 0 (S5) measured the perception ladder on 30 windows you captured: Explorer
 
 The ladder assumed the model could answer "#14" among all of a window's controls. At this model size it can't, and it is the slowest local step.
 
-## Decision (proposed)
+## Decision
 1. **Names first, in code.** A request that names a control ("click Save", "open the Downloads folder") is matched by deterministic code, not the model: first against UI Automation names, automation IDs and roles, then against OCR text where UI Automation has nothing. A single match goes straight to the Tool Gateway's usual checks, without calling the vision model.
 2. **Vision chooses among a few candidates.** When several elements match, or the reference is visual or positional ("the blue one", "the icon next to the search bar"), the overlay numbers only a short list of candidates instead of every control. The first Phase 5 experiment measures how short the list must be and what accuracy it reaches; the working assumption is up to about eight.
 3. **Scoped snapshots.** UI Automation reads the focused pane or the region in question rather than every row of a large window, to bring Explorer under 500 ms.
@@ -27,7 +27,7 @@ The ladder assumed the model could answer "#14" among all of a window's controls
 ## Consequences
 - Most "click X" requests never wait for the vision model. In apps that expose names, the slowest local step drops from 3–5 s to the UI Automation snapshot plus matching (0.3–0.65 s p90).
 - Apps that expose nothing stay weak until Phase 5's evaluations, and KNOWN_LIMITATIONS says so.
-- On acceptance, ARCHITECTURE.md §11 gains a name-matching level between UI Automation and OCR, and the numbered overlay covers a short candidate list only.
+- ARCHITECTURE.md §11 gains a name-matching level after UI Automation, and the numbered overlay covers a short candidate list only.
 - Phase 5's benchmark includes the candidate-list experiment and sets its targets from S5's numbers.
 
 ## Revisit if

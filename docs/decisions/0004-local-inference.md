@@ -25,7 +25,7 @@ The RTX 3060 Laptop has 6 GB of VRAM, ~770 MiB of which the desktop already uses
 
 ## Phase 0 result
 Measured in S1 ([results](../benchmarks/phase0.md#s1-local-models)):
-- **Resident:** Qwen3.5-4B Q4_K_M with its F16 projector on the GPU, 8K context, thinking off. First token 114 ms with the prompt cached, 74.5 tokens/s, 3,856 MiB of VRAM, routing 95%, valid tool calls 96.7%, screenshot answers in 0.96 s. It was the only candidate to meet the routing and tool targets.
+- **Resident:** Qwen3.5-4B Q4_K_M with its F16 projector on the GPU, 8K context, thinking off. First token 114 ms with the prompt cached, 74.5 tokens/s, 3,856 MiB of VRAM, routing 95%, valid tool calls 96.7%, screenshot answers in 0.96 s on a small test dialog (2–5 s on your real windows in S5). It was the only candidate to meet the routing and tool targets.
 - **Deep tier:** Qwen3.5-9B Q3_K_M (4,454 MiB at 8K), switched by restarting llama-server and restoring its saved system-prompt cache: ~4.4 s, slightly over the 4 s target. Router mode was slower (4.9–7.7 s) and erratic.
 - **CPU fallback:** Qwen3.5-0.8B, for conversation only: it made valid tool calls 40% of the time, so with the GPU unloaded only the deterministic fast path runs commands. LFM2.5-1.2B is out (1.7 s to first token).
 - **Injection:** one of the 15 injection cases called a tool. The untrusted-content rules ([ADR-0006](0006-tool-gateway-security.md)) handle it, and the cases become a regression test in Phase 2.

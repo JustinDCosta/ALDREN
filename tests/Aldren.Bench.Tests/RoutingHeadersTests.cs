@@ -32,4 +32,17 @@ public class RoutingHeadersTests
         Assert.False(RoutingHeaders.IsAllowed(new RoutedVia("openrouter", "meta-llama/llama-4-scout:free"), allowed));
         Assert.True(RoutingHeaders.IsAllowed(new RoutedVia("groq", "llama-3.3-70b-versatile"), allowed));
     }
+
+    [Fact]
+    public void Model_outside_the_chain_is_rejected_even_on_an_allowed_platform()
+    {
+        var chain = RoutingHeaders.Chain("groq/gpt-oss-120b,groq/gpt-oss-20b");
+
+        Assert.False(RoutingHeaders.IsInChain(new RoutedVia("groq", "llama-3.3-70b-versatile"), chain));
+        Assert.True(RoutingHeaders.IsInChain(new RoutedVia("groq", "gpt-oss-120b"), chain));
+    }
+
+    [Fact]
+    public void Chain_platforms_come_from_its_entries() =>
+        Assert.Equal(["google", "groq"], RoutingHeaders.Platforms(RoutingHeaders.Chain("google/gemini-2.5-flash, groq/qwen3.8-27b")).Order());
 }
