@@ -12,6 +12,8 @@ internal sealed class VoiceProbe : IDisposable
     private readonly string _models;
     private readonly OfflineRecognizer _recognizer;
     private readonly OfflineTts _tts;
+    private readonly float[] _reference = [];
+    private readonly int _referenceRate;
 
     public VoiceProbe(string models, int threads, float hangoverSeconds, bool englishOnlyFrontEnd = false, string ttsEngine = "kokoro",
         bool fullPrecisionKokoro = false)
@@ -53,6 +55,34 @@ internal sealed class VoiceProbe : IDisposable
             tts.Model.Vits.Tokens = Path.Combine(piper, "tokens.txt");
             tts.Model.Vits.DataDir = Path.Combine(piper, "espeak-ng-data");
         }
+        else if (ttsEngine == "supertonic")
+        {
+            // Reads characters directly, so no phonemiser is needed.
+            var dir = Path.Combine(models, "sherpa-onnx-supertonic-3-tts-int8-2026-05-11");
+            tts = new OfflineTtsConfig();
+            tts.Model.Supertonic.DurationPredictor = Path.Combine(dir, "duration_predictor.int8.onnx");
+            tts.Model.Supertonic.TextEncoder = Path.Combine(dir, "text_encoder.int8.onnx");
+            tts.Model.Supertonic.VectorEstimator = Path.Combine(dir, "vector_estimator.int8.onnx");
+            tts.Model.Supertonic.Vocoder = Path.Combine(dir, "vocoder.int8.onnx");
+            tts.Model.Supertonic.TtsJson = Path.Combine(dir, "tts.json");
+            tts.Model.Supertonic.UnicodeIndexer = Path.Combine(dir, "unicode_indexer.bin");
+            tts.Model.Supertonic.VoiceStyle = Path.Combine(dir, "voice.bin");
+        }
+        else if (ttsEngine == "pocket")
+        {
+            // Streams audio as it generates; the voice is cloned from a reference clip.
+            var dir = Path.Combine(models, "sherpa-onnx-pocket-tts-2026-01-26");
+            tts = new OfflineTtsConfig();
+            tts.Model.Pocket.LmFlow = Path.Combine(dir, "lm_flow.onnx");
+            tts.Model.Pocket.LmMain = Path.Combine(dir, "lm_main.onnx");
+            tts.Model.Pocket.Encoder = Path.Combine(dir, "encoder.onnx");
+            tts.Model.Pocket.Decoder = Path.Combine(dir, "decoder.onnx");
+            tts.Model.Pocket.TextConditioner = Path.Combine(dir, "text_conditioner.onnx");
+            tts.Model.Pocket.VocabJson = Path.Combine(dir, "vocab.json");
+            tts.Model.Pocket.TokenScoresJson = Path.Combine(dir, "token_scores.json");
+            tts.Model.Pocket.VoiceEmbeddingCacheCapacity = 4;
+            (_reference, _referenceRate) = AudioUtil.ReadWavNative(Path.Combine(dir, "test_wavs", "bria.wav"));
+        }
 
         tts.Model.NumThreads = threads;
         tts.Model.Provider = "cpu";
@@ -64,6 +94,9 @@ internal sealed class VoiceProbe : IDisposable
     public int Threads { get; }
     public float Hangover { get; }
     public string TtsEngine { get; }
+
+    /// <summary>Flow-matching steps for Supertonic: fewer is faster, more is cleaner.</summary>
+    public int Steps { get; init; } = 5;
     public int TtsSampleRate => _tts.SampleRate;
 
     public VoiceActivityDetector CreateVad()
@@ -151,7 +184,25 @@ internal sealed class VoiceProbe : IDisposable
             return 1;
         }
 
-        var audio = _tts.GenerateWithCallback(text, 1.0f, speaker, OnChunk); // has Dispose() but not IDisposable
+        int OnChunkWithProgress(IntPtr samples, int n, float progress, IntPtr arg) => OnChunk(samples, n);
+
+        OfflineTtsGeneratedAudio audio; // has Dispose() but not IDisposable
+        if (TtsEngine is "supertonic" or "pocket")
+        {
+            var generation = new OfflineTtsGenerationConfig { Sid = speaker, Speed = 1.0f, NumSteps = Steps, SilenceScale = 0.2f };
+            if (TtsEngine == "pocket")
+            {
+                generation.ReferenceAudio = _reference;
+                generation.ReferenceSampleRate = _referenceRate;
+            }
+
+            audio = _tts.GenerateWithConfig(text, generation, OnChunkWithProgress);
+        }
+        else
+        {
+            audio = _tts.GenerateWithCallback(text, 1.0f, speaker, OnChunk);
+        }
+
         try
         {
             var total = clock.Elapsed.TotalMilliseconds;

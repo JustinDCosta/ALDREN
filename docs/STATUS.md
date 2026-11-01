@@ -20,8 +20,8 @@ Labels: **Planned** · **In progress** · **Implemented** (code written, not yet
 | Benchmark tool (`tools/bench`) | 0 | Tested | Kept for regression runs |
 | S1 local model benchmarks | 0 | Tested | Qwen3.5-4B resident, Qwen3.5-9B deep tier via restart, Qwen3.5-0.8B CPU fallback; see [benchmarks/phase0.md](benchmarks/phase0.md) |
 | S2 island overlay | 0 | Tested | WinUI 3 prototype passes all 8 checks (automated on both screens, plus your OBS, Snipping Tool and smoothness checks) |
-| Recording tool (`aldren-record`, shared by S3 and S4) | 0 | Implemented | Fixed after the first session came out time-squeezed (PortAudio's WASAPI path ran the PD300X at half speed); now MME with timed reads and a startup self-test. The session needs redoing |
-| S3 voice pipeline probe | 0 | In progress | Recognition meets its budget on the CPU; text-to-speech misses it (655 ms first audio at best) and needs a decision; live microphone tests wait for you |
+| Recording tool (`aldren-record`, shared by S3 and S4) | 0 | Tested | Fixed after the first session came out time-squeezed (PortAudio's WASAPI path ran the PD300X at half speed); the second session (112 takes, 2026-11-01) is clean |
+| S3 voice pipeline probe | 0 | In progress | On your voice: 5.4% English word error rate, 137 ms recognition; Supertonic 3 speaks in ~210 ms on the CPU, so a turn takes ~0.75 s plus the model's first sentence. Left: the live microphone, unplug and Bluetooth checks with you |
 | Spikes S4–S8 | 0 | Planned | |
 | Core and App processes, IPC, tray, startup, configuration, logging | 1 | Planned | |
 | Tool Gateway, permissions, audit log | 1 | Planned | |

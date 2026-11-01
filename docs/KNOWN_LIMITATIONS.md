@@ -20,8 +20,9 @@ These are deliberate, honest limits of the design on this hardware. Update this 
 - Bluetooth headset microphones drop your headphones into low-quality hands-free audio, so ALDREN avoids them by default.
 - On speakers, interrupting ALDREN mid-sentence needs echo cancellation (Phase 9). Until then, the mic is muted while ALDREN speaks, except for "stop" and the hotkey.
 - While listening is on, Windows shows the microphone-in-use icon permanently.
-- The French text-to-speech voices are weaker than the English ones. The Kokoro model installed for S3 has no French voice at all, and sherpa-onnx 2.0 no longer ships a phonemiser, so French speech needs another model and phonemiser (decision pending).
-- On the CPU, Kokoro takes ~0.65 s to start speaking even a short reply (measured in S3), so instant spoken answers need pre-recorded acknowledgements or synthesis on the GPU.
+- ALDREN speaks English only (your decision, 2026-11-01); it can still understand some French, but recognition makes about one error in two French words.
+- The voice (Supertonic 3) starts ~0.2 s after a sentence is ready. It generates a whole sentence at once, so replies are spoken sentence by sentence and very long first sentences start later.
+- A pause of 300 ms or more in the middle of a command can still look like the end of it; ALDREN waits 400 ms, which caught every pause in your recordings.
 
 ## Windows control
 - ALDREN cannot control elevated (admin) windows or UAC prompts, by design.

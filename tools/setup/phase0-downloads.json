@@ -95,6 +95,20 @@
         "extractTo":  "voice/models"
     },
     {
+        "name":  "Supertonic 3 TTS int8 (sherpa-onnx)",
+        "url":  "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/sherpa-onnx-supertonic-3-tts-int8-2026-05-11.tar.bz2",
+        "sha256":  "82fa96f91c4ef8abaae3a14a3f4153facf88bed821d1f7331cec2700f432c427",
+        "dest":  "downloads/voice/sherpa-onnx-supertonic-3-tts-int8-2026-05-11.tar.bz2",
+        "extractTo":  "voice/models"
+    },
+    {
+        "name":  "Pocket TTS (sherpa-onnx)",
+        "url":  "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/sherpa-onnx-pocket-tts-2026-01-26.tar.bz2",
+        "sha256":  "61422a478ef09d9b2c067261fb822e11786e0c86842c76d8633b7069968be7b5",
+        "dest":  "downloads/voice/sherpa-onnx-pocket-tts-2026-01-26.tar.bz2",
+        "extractTo":  "voice/models"
+    },
+    {
         "name":  "Silero VAD (sherpa-onnx)",
         "url":  "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
         "sha256":  "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",

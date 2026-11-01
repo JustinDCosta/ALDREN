@@ -43,6 +43,22 @@ internal static class AudioUtil
     }
 
     public static float[] Silence(double seconds) => new float[(int)(seconds * SampleRate)];
+
+    /// <summary>Reads a WAV file as mono floats at its own sample rate.</summary>
+    public static (float[] Samples, int Rate) ReadWavNative(string path)
+    {
+        using var reader = new AudioFileReader(path);
+        var mono = new DownmixSampleProvider(reader);
+        var samples = new List<float>();
+        var buffer = new float[8192];
+        int read;
+        while ((read = mono.Read(buffer)) > 0)
+        {
+            samples.AddRange(buffer.AsSpan(0, read));
+        }
+
+        return ([.. samples], reader.WaveFormat.SampleRate);
+    }
 }
 
 internal sealed class ArraySampleProvider(float[] samples, int rate) : ISampleProvider

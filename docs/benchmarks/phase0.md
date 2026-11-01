@@ -27,6 +27,8 @@ Full URLs (commit-pinned for Hugging Face) are in [tools/setup/phase0-downloads.
 | Piper LibriTTS-R medium | sherpa-onnx tts-models release | `10dc268f3e371696d721486123e2705a9fc1faa113491979fde4d88dba1f1b1c` |
 | Keyword-spotting baseline (zipformer gigaspeech 3.3M) | sherpa-onnx kws-models release | `f170013b4716e41b62b9bfd809687c207cef798ef9bc6534d524e17af9b6561a` (no published digest for this 2024 asset; computed at download, size matched the release) |
 | sherpa-onnx (NuGet `org.k2fsa.sherpa.onnx`) and NAudio | 2.0.1 and 3.3.0 | pinned in `spikes/S3.Voice/S3.Voice.csproj` |
+| Supertonic 3 TTS int8 | sherpa-onnx tts-models release | `82fa96f91c4ef8abaae3a14a3f4153facf88bed821d1f7331cec2700f432c427` |
+| Pocket TTS (non-commercial licence) | sherpa-onnx tts-models release | `61422a478ef09d9b2c067261fb822e11786e0c86842c76d8633b7069968be7b5` |
 | uv | 0.13.6 | `a2a8820d5eea32f08ef467ef3b7f66883a9b076d5737a2fc2fbb5f458d1bb50f` |
 | CPython (uv-managed) | 3.12.16 | checked by uv against its built-in checksums; installed with `--no-bin --no-registry` |
 | Python packages for `tools/wakeword-trainer` | see `uv.lock` | every wheel's SHA-256 is in the lock file |
@@ -123,13 +125,32 @@ Console probe in `spikes/S3.Voice` (sherpa-onnx 2.0.1, NAudio 3.3.0), CPU only, 
 | End of speech + recognition on your voice (p50) | 537 ms | |
 | First audio, Kokoro v1.1 int8, 2–6 threads | 2.3–2.9 s for a short reply, slower than real time; more threads don't help | ≤ 300 ms |
 | First audio, Kokoro v1.1 fp32, 4 threads | 655–680 ms for "Sure, boss.", 825–850 ms for "Opening Spotify now, boss." | ≤ 300 ms |
-| End of speech + recognition + first audio (CPU, fp32) | ~1.3 s for a short command and reply | ≤ 1.1 s |
+| First audio, Supertonic 3, 3 steps, 4 threads | 213 ms for "Sure, boss.", 293 ms for "Opening Spotify now, boss." | ≤ 300 ms |
+| End of speech + recognition + first audio (CPU, Supertonic) | ~0.75 s for a short command and reply | ≤ 1.1 s |
 
 Findings:
 - **sherpa-onnx 2.0 dropped its built-in espeak-ng phonemiser** (espeak-ng is GPL). Kokoro v1.1 now reads English through a fixed word list and silently skips words it doesn't know: "Spotify", "what's", "skip", "downloads" and "notifications" vanished from the synthetic commands. Piper voices now need an external phonemiser, which also affects the synthetic training clips planned for S4.
 - **The installed Kokoro v1.1 is the Chinese and English release:** three English voices, no French voice.
 - **int8 Kokoro is about 3.5× slower than fp32 on this CPU**, so the quantised model is the wrong choice here.
-- Recognition is fast enough on the CPU; text-to-speech is not, so it needs a decision before Phase 3: a phonemiser and Kokoro v1.0 for French and better English voices, the GPU for synthesis, and pre-recorded acknowledgements ("Sure, boss.") to cover the wait.
+- Recognition is fast enough on the CPU. Kokoro on the CPU is not; Supertonic 3 is (below).
+
+### Fastest voice (English only, decided 2026-11-01)
+
+First audio for typical replies, CPU, 4 threads (6 threads is slower), median of 5 warm runs; nothing played:
+
+| Engine | "Sure, boss." | "Opening Spotify now, boss." | Two-sentence reply |
+|---|---|---|---|
+| Kokoro v1.1 int8 | 2,322 ms | 2,788 ms | 4,603 ms |
+| Kokoro v1.1 fp32 | 677 ms | 825 ms | 1,348 ms |
+| Pocket TTS (streams; non-commercial licence) | 460 ms | 766 ms | 998 ms |
+| Supertonic 3 int8, 5 steps | 344 ms | 446 ms | 729 ms |
+| **Supertonic 3 int8, 3 steps** | **213 ms** | **293 ms** | 459 ms |
+| Supertonic 3 int8, 2 steps | 160 ms | 211 ms | 336 ms |
+
+- **Supertonic 3 is the voice: ~210 ms to first audio at 3 steps,** on the CPU, with no phonemiser (it reads characters) and ten preset voices. It generates a whole reply in one go, so ALDREN splits replies into sentences and synthesises the first one first.
+- **End of speech:** a 300 ms wait would have cut 1 of the 30 recorded commands mid-sentence, 250 ms cut 2, and 400 ms none. ALDREN keeps 400 ms but starts recognition speculatively at 250 ms of silence and discards it if you keep talking, so the transcript is ready as the 400 ms ends.
+- **Estimated turn on this laptop:** end of speech 400 ms → transcript ready at about the same moment → model's first sentence ~250 ms → first audio ~210 ms: about 0.85–0.9 s from your last word to ALDREN's voice, or ~0.4 s with a pre-recorded acknowledgement. The measured part (end of speech + recognition + first audio) is ~0.75 s against the 1.1 s target.
+- Listening samples (all ten Supertonic voices, 2/3/5 steps, Kokoro and Pocket) are in `E:\AldrenData\bench\s3\samples`.
 
 - **Keep audio from before the VAD fires.** The VAD opens a segment only once it is sure speech started, which cut the first sound of "skip" and "ouvre"; keeping 300 ms from before the trigger halved the English error rate. ALDREN's audio service needs a short ring buffer for this. French is 53% word error rate on these takes, which no longer matters: ALDREN is English-only.
 

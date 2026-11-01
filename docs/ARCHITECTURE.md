@@ -39,7 +39,7 @@ Success means:
 - **Local-first:** voice, chat, PC control, reminders and memory work offline.
 - **Discretion:** it stays out of the way while you game or stream.
 
-Current assumptions: one user, personal use, English as the main spoken language with French understood.
+Current assumptions: one user, personal use, English-only speech ([ADR-0011](decisions/0011-supertonic-voice-english-only.md), proposed).
 
 ## 2. Target environment and budgets
 
@@ -295,7 +295,9 @@ Targets: ≤0.5 false wakes per hour and ≥95% detection at desk distance, meas
 
 **Speech-to-text:** Parakeet-TDT-0.6B-v3 (int8) via sherpa-onnx, on the CPU by default (~0.2–0.5 s per utterance *(est.)*), GPU optional. Larger models (Qwen3-ASR-1.7B, Granite Speech 4.1) are candidates for dictation later.
 
-**Text-to-speech:** Kokoro-82M via sherpa-onnx, with British male voices (bm_george, bm_lewis, bm_daniel) for you to choose from; first audio after the first sentence. Alternatives to benchmark: Kyutai Pocket TTS, Supertonic 3 (better French), Qwen3-TTS on the GPU. No real person's voice is cloned without rights.
+**Text-to-speech:** Supertonic 3 (int8) via sherpa-onnx on the CPU: ~0.2 s to first audio for a short sentence (measured in S3). Replies are split into sentences and spoken one at a time, first sentence first, in one of Supertonic's ten preset voices chosen by you ([ADR-0011](decisions/0011-supertonic-voice-english-only.md), proposed; Kokoro took ~0.7–2.9 s on the CPU). No real person's voice is cloned without rights.
+
+**End of speech:** 400 ms of silence ends a turn; recognition starts speculatively at 250 ms and is discarded if you keep talking, and 300 ms of audio from before the VAD fires is kept so first sounds aren't clipped.
 
 **Audio policy:**
 - Input priority: Maono PD300X, then the laptop array. Bluetooth headset microphones only if you choose them (they force low-quality hands-free audio). The NVIDIA Broadcast mic is optional; the wake word is validated on whichever input chain you use.
@@ -305,7 +307,7 @@ Targets: ≤0.5 false wakes per hour and ≥95% detection at desk distance, meas
 
 **Interruption:** natural with headphones. On speakers, v1 mutes the mic while ALDREN speaks, except for "stop" and the hotkey; echo cancellation arrives in Phase 9.
 
-**Languages:** English persona; French understood (STT) and answered with the best available French voice.
+**Languages:** English only (your decision, 2026-11-01). Some French may be understood, but it is not supported.
 
 ## 11. Screen understanding and Windows control
 
@@ -496,7 +498,7 @@ spikes/                        Phase 0 throwaway prototypes
 
 | Decision | Default |
 |---|---|
-| Spoken language | English persona; French understood and answered with the best available French voice |
+| Spoken language | English only |
 | Cloud spending | Free tiers by default; optional paid Gemini key (cap ~€5–10/month) for grounded research with sources |
 | Browser control | Companion extension in your main Chrome, plus a separate ALDREN automation profile |
 | Microphone | Maono PD300X; never Bluetooth headset microphones unless you choose them |

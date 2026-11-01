@@ -64,11 +64,20 @@ var report = new StringBuilder();
 var englishOnly = args.Contains("--en-only");
 var engine = Option("--tts") ?? "kokoro";
 var fp32 = args.Contains("--fp32");
-using var probe = new VoiceProbe(Models, threads, hangover, englishOnly, engine, fp32);
-Line($"## S3 {mode}, {DateTime.Now:yyyy-MM-dd HH:mm} ({threads} CPU threads, {hangover * 1000:F0} ms VAD hangover, TTS {engine}{(engine == "kokoro" ? fp32 ? " fp32" : " int8" : "")}{(englishOnly ? ", English-only front end" : "")})");
+var steps = int.Parse(Option("--steps") ?? "5", CultureInfo.InvariantCulture);
+using var probe = new VoiceProbe(Models, threads, hangover, englishOnly, engine, fp32) { Steps = steps };
+var ttsLabel = engine switch
+{
+    "kokoro" => fp32 ? "kokoro fp32" : "kokoro int8",
+    "supertonic" => $"supertonic 3, {steps} steps",
+    _ => engine,
+};
+Line($"## S3 {mode}, {DateTime.Now:yyyy-MM-dd HH:mm} ({threads} CPU threads, {hangover * 1000:F0} ms VAD hangover, TTS {ttsLabel}{(englishOnly ? ", English-only front end" : "")})");
 
 var code = mode switch
 {
+    "say" => Say(Option("--text") ?? "Sure, boss.", Option("--out") ?? throw new ArgumentException("say needs --out"),
+        int.Parse(Option("--voice") ?? "0", CultureInfo.InvariantCulture)),
     "tts" => Tts(),
     "synth" => Synth(),
     "files" => Files(args.ElementAtOrDefault(1) ?? throw new ArgumentException("files needs a session folder")),
@@ -80,6 +89,20 @@ Directory.CreateDirectory(ResultsDir);
 File.WriteAllText(Path.Combine(ResultsDir, $"{DateTime.Now:yyyyMMdd-HHmmss}-{mode}.md"), report.ToString());
 File.AppendAllText(Path.Combine(ResultsDir, "results.md"), report + Environment.NewLine);
 return code;
+
+// Writes one reply to a WAV file for listening; nothing is played.
+int Say(string text, string path, int voice)
+{
+    var (firstMs, totalMs, samples) = probe.Speak(text, voice);
+    Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+    using (var writer = new NAudio.Wave.WaveFileWriter(path, NAudio.Wave.WaveFormat.CreateIeeeFloatWaveFormat(probe.TtsSampleRate, 1)))
+    {
+        writer.WriteSamples(samples, 0, samples.Length);
+    }
+
+    Line($"- {Path.GetFileName(path)}: voice {voice}, first audio {firstMs:F0} ms, {samples.Length / (double)probe.TtsSampleRate:F2} s of audio");
+    return 0;
+}
 
 int Tts()
 {
@@ -94,8 +117,16 @@ int Tts()
     Line("|---|---|---|---|---|---|");
     foreach (var reply in replies)
     {
-        // Kokoro v1.1: af_maple and bf_vale, two of its three English voices. Piper LibriTTS-R: two of its 904 speakers.
-        foreach (var speaker in probe.TtsEngine == "piper" ? new[] { 0, 100 } : [0, 2])
+        // Kokoro v1.1: af_maple and bf_vale, two of its three English voices. Piper: two of its 904 speakers.
+        // Supertonic: two of its preset voice styles. Pocket: one voice, cloned from the reference clip.
+        int[] speakers = probe.TtsEngine switch
+        {
+            "piper" => [0, 100],
+            "supertonic" => [0, 5],
+            "pocket" => [0],
+            _ => [0, 2],
+        };
+        foreach (var speaker in speakers)
         {
             var runs = Enumerable.Range(0, 5).Select(_ => probe.Speak(reply, speaker)).ToList();
             var first = runs.Select(r => r.FirstChunkMs).Order().ToList();
@@ -105,9 +136,10 @@ int Tts()
         }
     }
 
-    Line(probe.TtsEngine == "piper"
-        ? "French: not measured; this Piper voice is English only."
-        : "French: not measurable with this model; Kokoro v1.1 has no French voice.");
+    if (probe.TtsEngine == "kokoro")
+    {
+        Line("French: not measurable with this model; Kokoro v1.1 has no French voice.");
+    }
     return 0;
 }
 
