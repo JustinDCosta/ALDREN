@@ -29,6 +29,10 @@ Full URLs (commit-pinned for Hugging Face) are in [tools/setup/phase0-downloads.
 | sherpa-onnx (NuGet `org.k2fsa.sherpa.onnx`) and NAudio | 2.0.1 and 3.3.0 | pinned in `spikes/S3.Voice/S3.Voice.csproj` |
 | Supertonic 3 TTS int8 | sherpa-onnx tts-models release | `82fa96f91c4ef8abaae3a14a3f4153facf88bed821d1f7331cec2700f432c427` |
 | Pocket TTS (non-commercial licence) | sherpa-onnx tts-models release | `61422a478ef09d9b2c067261fb822e11786e0c86842c76d8633b7069968be7b5` |
+| openWakeWord negative features (ACAV100M, 2,000 h) | davidscripka/openwakeword_features @ 985bf1b | `721a66d0682c65a1b5c1da0aa109409cede1d20e28b15235c344b000cbb7654f` |
+| openWakeWord validation features (10.7 h) | davidscripka/openwakeword_features @ 985bf1b | `a56a8a0f8e0efb91900acc6de4c0cdf4c564842e8475a7d49b36c039e17a690f` |
+| openWakeWord melspectrogram and embedding models | dscripka/openWakeWord v0.5.1 release | `ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176f`, `70d164290c1d095d1d4ee149bc5e00543250a7316b59f31d056cff7bd3075c1f` (no published digests; computed at download, sizes matched) |
+| PyTorch (CPU), ONNX Runtime, sherpa-onnx, openWakeWord (Python) | 2.15.0, 1.31.1, 2.0.1, 0.6.0 | locked with hashes in `tools/wakeword-trainer/uv.lock` |
 | uv | 0.13.6 | `a2a8820d5eea32f08ef467ef3b7f66883a9b076d5737a2fc2fbb5f458d1bb50f` |
 | CPython (uv-managed) | 3.12.16 | checked by uv against its built-in checksums; installed with `--no-bin --no-registry` |
 | Python packages for `tools/wakeword-trainer` | see `uv.lock` | every wheel's SHA-256 is in the lock file |
@@ -155,6 +159,28 @@ First audio for typical replies, CPU, 4 threads (6 threads is slower), median of
 - **Keep audio from before the VAD fires.** The VAD opens a segment only once it is sure speech started, which cut the first sound of "skip" and "ouvre"; keeping 300 ms from before the trigger halved the English error rate. ALDREN's audio service needs a short ring buffer for this. French is 53% word error rate on these takes, which no longer matters: ALDREN is English-only.
 
 Still to do, with you: the three microphones live, the unplug test ("Input device disappeared"), and the Bluetooth headset check.
+
+## S4: wake word (in progress)
+
+Tools in `tools/wakeword-trainer` (`aldren-synth`, `aldren-train`, `aldren-eval`, `aldren-listen`). Training data:
+- **Synthetic:** 40,000 clips from Piper's LibriTTS-R model (904 speakers), fed hand-written phonemes. sherpa-onnx 2.0 has no phonemiser, and Supertonic mispronounced the name ("Al drum", "Bildroll"). Parakeet heard "Aldrin" in 21 of 30 random wake-word clips. "Aldrin" sounds exactly like ALDREN as you say it, so it is a positive, not a near miss.
+- **Your session:** 54 wake-word takes for training (6 per style) and 27 held out; 20 commands as negatives and 10 held out; 30 s of room noise. All augmented with reverb, mic EQ, level changes and noise.
+- **General audio:** 2,000 h of openWakeWord's precomputed ACAV100M features. Its 10.7 h validation stream is split: half picks checkpoints, half reports.
+
+| Model | Misses on your held-out takes | False wakes per hour | Your held-out commands triggering |
+|---|---|---|---|
+| 1. Synthetic-heavy, light negative weighting (threshold 0.9) | 18.5% | 26 (full 10.7 h) | 2/10 |
+| 2. openWakeWord's recipe (negative weight to 1,000), checkpoint picked under 0.5/h | 85.2% | 0.0 | 0/10 |
+| 3. As 2, with your takes as half of every positive batch (threshold 0.9) | 7.4% | 36.7 | 5/10 |
+| Second stage alone: Parakeet transcript must contain "Aldrin" or close | 44.4% | not measurable offline | 0/10 |
+| Baseline: sherpa-onnx keyword spotter, no training | 100% | | 0/10 |
+
+Targets: ≤ 5% misses and ≤ 0.5 false wakes per hour. The field listener uses 0.65% CPU (target ≤ 2%).
+
+Findings so far:
+- From synthetic speech plus 54 real takes, one network trades misses for false wakes but doesn't reach both targets: it either learns Piper's voice (and misses yours) or learns your voice (and fires on you saying anything).
+- The transcript check never confirmed a command, but Parakeet hears your "ALDREN" as "children", "already", "El dream" or nothing in a third of takes, so it can't simply be bolted on.
+- Next, as the plan prescribes: the field test with model 3 at threshold 0.9. Every trigger is saved as a 2 s clip with its transcript, then the model is retrained with those real false alarms as negatives. More of your takes (another ~200) and a hotword-biased transcript check are the next levers if that isn't enough.
 
 ### The first recording session was unusable
 The 2026-10-31 session (112 takes on the PD300X) came out squeezed about 2× in time: speech spans were half their normal length and nothing could be transcribed, even though the levels were normal. Through PortAudio's WASAPI path, the PD300X (192 kHz, stereo) delivered one second of audio every 2.07 s, whatever rate or channel count was requested. NAudio reading WASAPI directly received the full 191.8 kHz, and the laptop microphone's 48 kHz arrived correctly, so the device is fine and PortAudio's WASAPI path is at fault. The recorder now captures through MME at 48 kHz (the Windows audio engine converts), times every read, refuses to start if a one-second self-test arrives at the wrong speed, and says "Speak now" only once capture is running. The session has to be redone; the old one is set aside as `2026-10-31-invalid-timing`. For Phase 3: ALDREN's audio service uses NAudio on WASAPI, which delivered correctly, and should time-check its capture the same way.

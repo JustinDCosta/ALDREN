@@ -7,10 +7,32 @@ dependencies = [
     "numpy>=2.3",
     "scipy>=1.16",
     "sounddevice>=0.5.2",
+    "soundfile>=0.13",
+    "onnxruntime>=1.23",
+    "sherpa-onnx==2.0.1",
+    "openwakeword==0.6.0",
+    "torch==2.15.*",
 ]
 
 [project.scripts]
 aldren-record = "aldren_wakeword.record:main"
+aldren-synth = "aldren_wakeword.synth:main"
+aldren-train = "aldren_wakeword.train:main"
+aldren-eval = "aldren_wakeword.evaluate:main"
+aldren-listen = "aldren_wakeword.listen:main"
+
+# Windows only: openWakeWord's Linux-only tflite-runtime dependency has no Python 3.12 wheels.
+[tool.uv]
+environments = ["sys_platform == 'win32'"]
+
+# The CPU build of PyTorch comes from PyTorch's own index; everything else from PyPI.
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [dependency-groups]
 dev = ["pytest>=8.4"]

@@ -22,7 +22,8 @@ Labels: **Planned** · **In progress** · **Implemented** (code written, not yet
 | S2 island overlay | 0 | Tested | WinUI 3 prototype passes all 8 checks (automated on both screens, plus your OBS, Snipping Tool and smoothness checks) |
 | Recording tool (`aldren-record`, shared by S3 and S4) | 0 | Tested | Fixed after the first session came out time-squeezed (PortAudio's WASAPI path ran the PD300X at half speed); the second session (112 takes, 2026-11-01) is clean |
 | S3 voice pipeline probe | 0 | In progress | On your voice: 5.4% English word error rate, 137 ms recognition; Supertonic 3 speaks in ~210 ms on the CPU, so a turn takes ~0.75 s plus the model's first sentence. Left: the live microphone, unplug and Bluetooth checks with you |
-| Spikes S4–S8 | 0 | Planned | |
+| S4 wake word | 0 | In progress | Trainer, evaluation and field listener built; best model misses 7.4% of your held-out takes but fires ~37 times/h on other audio (targets ≤ 5% and ≤ 0.5/h). Field test next: it needs ~10 h of your normal use |
+| Spikes S5–S8 | 0 | Planned | |
 | Core and App processes, IPC, tray, startup, configuration, logging | 1 | Planned | |
 | Tool Gateway, permissions, audit log | 1 | Planned | |
 | Local inference and residency manager | 2 | Planned | Models chosen in S1; the llama-server client must retry dropped keep-alive connections |
@@ -52,4 +53,5 @@ Labels: **Planned** · **In progress** · **Implemented** (code written, not yet
 
 ## Waiting on you
 - S3: a short live test on each microphone, unplugging the PD300X mid-capture once, and the Bluetooth headset check.
-- Later in Phase 0: the screen captures, Chrome toggles, provider keys, network switching and the 10-hour wake-word field test listed in the plan.
+- S4: the wake-word field test, `aldren-listen --threshold 0.9` running during ~10 h of normal use over a few days.
+- Later in Phase 0: the screen captures, Chrome toggles, provider keys and network switching listed in the plan.
