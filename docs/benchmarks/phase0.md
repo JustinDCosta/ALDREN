@@ -235,3 +235,20 @@ Measured so far, without you:
 Notes for Phase 7: clicks from a page script are synthetic (`isTrusted` is false), and some sites ignore them; Playwright's are real input events. On Chrome 156 an extension passed with `--load-extension` never started, even with the `DisableLoadExtensionCommandLineSwitch` feature turned off (no service worker among the browser's targets), so the companion extension gets installed by hand or published, not sideloaded.
 
 Still to do, with you: `run-s6.ps1` (load the extension in the test profile, approve one remote-debugging prompt, then remote debugging goes off again and the host key is removed).
+
+## S7: network identity (in progress)
+
+Console probe in `spikes/S7.Network`. A network's fingerprint is the SHA-256 of Windows' network ID (Network List Manager) and the gateway's MAC address (`GetBestRoute2` then `ResolveIpNetEntry2`); only the hashes are stored, in `E:\AldrenData\bench\s7\home.json`. Home if any physical network matches, Away if physical networks are up and none matches, Unknown with none (offline, still identifying, or only a VPN up).
+- `snapshot`: connected networks with adapter, gateway, Wi-Fi name (if Windows allows) and the state.
+- `enroll`: adds the physical networks connected right now to the home fingerprints.
+- `watch`: re-evaluates every 200 ms and logs each link and state change, timed from the moment a link came up; Ctrl+C writes a summary to `results.md`.
+
+Checked without you, on the home Ethernet:
+- Ethernet (Killer E2600) comes back physical with its gateway's MAC; Tailscale comes back virtual and is ignored. Virtual means the adapter lacks NDIS's hardware-interface flag (`GetIfEntry2`), which catches VPN tunnels and Hyper-V adapters whatever they're called.
+- After a temporary enrollment (deleted afterwards) the state was Home, and Away without it. A snapshot takes ~50 ms, or ~125 ms with the Wi-Fi name lookup (netsh).
+- `GetIPv4Properties` throws for adapters without IPv4 (one is up on this laptop), so adapters are asked whether they support IPv4 first.
+- Windows 11 only gives desktop apps the Wi-Fi name with location access, so the fingerprint doesn't use it; it's shown when available.
+
+Notes for Phase 4: ALDREN subscribes to the Network List Manager's events instead of polling, and uses the WLAN API rather than netsh.
+
+Still to do, with you: enroll on Ethernet and on Wi-Fi; under `watch`, 10 reconnects on each, a phone hotspot (expect Away) and Tailscale on and off (expect no change); 2 reboots on each with a `snapshot` afterwards (expect Home).

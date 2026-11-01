@@ -25,7 +25,8 @@ Labels: **Planned** · **In progress** · **Implemented** (code written, not yet
 | S4 wake word | 0 | In progress | Trainer, evaluation and field listener built; best model misses 7.4% of your held-out takes but fires ~37 times/h on other audio (targets ≤ 5% and ≤ 0.5/h). Field test next: it needs ~10 h of your normal use |
 | S5 screen perception probe | 0 | In progress | Selftest on a synthetic window passes end to end: UI Automation 144 ms, OCR reads 9/9 labels, numbered boxes 8/9 at ~0.5 s per question. The measurement needs your captures |
 | S6 browser bridge probe | 0 | In progress | Host, page script and Playwright channel checked without you (host relay 0.10 ms p90, injected instructions inert, installed Chrome driven on a separate profile). Through Chrome itself it needs your session |
-| Spikes S7–S8 | 0 | Planned | |
+| S7 network identity probe | 0 | In progress | On the home Ethernet: physical network fingerprinted, Tailscale recognised as virtual and ignored, Home/Away correct. The reconnect, hotspot and reboot checks need you |
+| Spike S8 | 0 | Planned | |
 | Core and App processes, IPC, tray, startup, configuration, logging | 1 | Planned | |
 | Tool Gateway, permissions, audit log | 1 | Planned | |
 | Local inference and residency manager | 2 | Planned | Models chosen in S1; the llama-server client must retry dropped keep-alive connections |
@@ -58,4 +59,5 @@ Labels: **Planned** · **In progress** · **Implemented** (code written, not yet
 - S4: the wake-word field test, `aldren-listen --threshold 0.9` running during ~10 h of normal use over a few days.
 - S5: about 30 window captures (Chrome, VS Code, Explorer, Discord, Steam and an error dialog) with `S5.Perception.exe capture`; the captures stay in `E:\AldrenData\bench\s5`.
 - S6: `spikes\S6.BrowserBridge\run-s6.ps1`, about 10 minutes: load the test extension in a separate Chrome profile and approve one remote-debugging prompt; it removes what it adds.
-- Later in Phase 0: provider keys and network switching listed in the plan.
+- S7: with `spikes\S7.Network\bin\Release\net10.0-windows\win-x64\S7.Network.exe`: `enroll` on Ethernet and again on Wi-Fi, then `watch` while you reconnect each 10 times, join a phone hotspot and toggle Tailscale; after 2 reboots on each, `snapshot`.
+- Later in Phase 0: provider keys for S8, listed in the plan.

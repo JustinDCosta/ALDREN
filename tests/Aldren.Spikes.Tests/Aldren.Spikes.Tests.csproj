@@ -18,6 +18,7 @@
     <ProjectReference Include="..\..\spikes\S3.Voice\S3.Voice.csproj" />
     <ProjectReference Include="..\..\spikes\S5.Perception\S5.Perception.csproj" />
     <ProjectReference Include="..\..\spikes\S6.BrowserBridge\Host\S6.Host.csproj" />
+    <ProjectReference Include="..\..\spikes\S7.Network\S7.Network.csproj" />
   </ItemGroup>
 
   <ItemGroup>
