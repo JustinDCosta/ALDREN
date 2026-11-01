@@ -27,6 +27,8 @@ Full URLs (commit-pinned for Hugging Face) are in [tools/setup/phase0-downloads.
 | Piper LibriTTS-R medium | sherpa-onnx tts-models release | `10dc268f3e371696d721486123e2705a9fc1faa113491979fde4d88dba1f1b1c` |
 | Keyword-spotting baseline (zipformer gigaspeech 3.3M) | sherpa-onnx kws-models release | `f170013b4716e41b62b9bfd809687c207cef798ef9bc6534d524e17af9b6561a` (no published digest for this 2024 asset; computed at download, size matched the release) |
 | sherpa-onnx (NuGet `org.k2fsa.sherpa.onnx`) and NAudio | 2.0.1 and 3.3.0 | pinned in `spikes/S3.Voice/S3.Voice.csproj` |
+| FlaUI.UIA3 (NuGet) | 5.0.0 | pinned in `spikes/S5.Perception/S5.Perception.csproj` |
+| Microsoft.Playwright (NuGet; drives the installed Chrome, no browsers downloaded) | 1.64.1 | SHA-512 `JwfBle/dD07BvmskthmRsGH9FomOJ+enbxk8iy5kKEaA9mrfix33IQ2hH4oBpcL5gLjt+d0u8RrH1gufyDbZFg==` (base64, as NuGet records it) |
 | Supertonic 3 TTS int8 | sherpa-onnx tts-models release | `82fa96f91c4ef8abaae3a14a3f4153facf88bed821d1f7331cec2700f432c427` |
 | Pocket TTS (non-commercial licence) | sherpa-onnx tts-models release | `61422a478ef09d9b2c067261fb822e11786e0c86842c76d8633b7069968be7b5` |
 | openWakeWord negative features (ACAV100M, 2,000 h) | davidscripka/openwakeword_features @ 985bf1b | `721a66d0682c65a1b5c1da0aa109409cede1d20e28b15235c344b000cbb7654f` |
@@ -212,3 +214,24 @@ Findings so far:
 - Windows OCR has English and French installed.
 
 Still to do, with you: about 30 captures across Chrome, VS Code, Explorer, Discord, Steam and an error dialog, then `analyze` and `ground`.
+
+## S6: browser bridge (in progress)
+
+Prototype in `spikes/S6.BrowserBridge`: a Manifest V3 extension, a native-messaging host in C#, a test page and a Playwright console (Microsoft.Playwright 1.64.1, driving the installed Chrome 156; no Playwright browsers downloaded). `run-s6.ps1` walks through the session that needs you.
+- **Extension:** asks for `nativeMessaging` and `http://127.0.0.1/*` only, so its page script can't run on real sites. A fixed public key in the manifest pins its ID (`mhipkigoofdhdiigilekjfpkhemnjajm`), which the host manifest allows and nothing else. It lives in the separate test profile, not your everyday Chrome.
+- **Host:** Chrome starts it when the extension connects. It relays to a named pipe that only your Windows account can open, forwards only `ping`, `read`, `click` and `fill` and refuses anything else itself, and logs events but never page content.
+- **Page script:** reads the title, visible text and interactive elements with IDs; clicks and fills by ID. It never returns password values and refuses to fill password fields. Page text goes back as data and nothing in it is acted on.
+
+Measured so far, without you:
+
+| Check | Result | Target |
+|---|---|---|
+| Host relay, with this PC standing in for the extension | 0.10 ms p90 per round trip; `exec` and malformed lines refused and never forwarded; host exits 2 ms after Chrome disconnects | |
+| Page script on the test page (run in a browser tab, outside the extension) | 8 controls found with labels; click, fill and submit logged by the page; password value null and refused for filling; the injected instructions come back as text and nothing acts on them | |
+| Separate profile through Playwright | installed Chrome started on `E:\AldrenData\browser-profile` in 454 ms (headless); a Playwright click (real input events, unlike the page script's synthetic clicks) logged by the page in 114 ms | |
+| Ping through Chrome and the extension | waiting for your session | p90 ≤ 50 ms |
+| CDP attach to your running Chrome (`chrome://inspect/#remote-debugging`, with Chrome's approval prompt) | waiting for your session | |
+
+Notes for Phase 7: clicks from a page script are synthetic (`isTrusted` is false), and some sites ignore them; Playwright's are real input events. On Chrome 156 an extension passed with `--load-extension` never started, even with the `DisableLoadExtensionCommandLineSwitch` feature turned off (no service worker among the browser's targets), so the companion extension gets installed by hand or published, not sideloaded.
+
+Still to do, with you: `run-s6.ps1` (load the extension in the test profile, approve one remote-debugging prompt, then remote debugging goes off again and the host key is removed).

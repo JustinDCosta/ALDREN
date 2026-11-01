@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "ALDREN bridge probe",
+  "description": "Phase 0 test of ALDREN's browser bridge. Works only on the local test page.",
+  "version": "0.1",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwIlSW8SNuIMWGgcq0qn/pAuzavTv5lq3a0PpF1iGcBVJ7psHy00EiYmPyTY/VxklanHCtuOSqk+eZJ/lyfh4XbVJEeGeDhknq7TJbEqHL2bxmA43OCd7bBNa93mVk3eUQA7AIHNIKIUteWaf63XqtOyYA7ScG3nztAmVx8+sVGfrYRBqi2Sv8HOsMqZeMiHSFoAwuxfcSesp2sZ1sjB06S+mReku7r8MbMr5At9koVhbEmoNqFLSMkIJOjlWdiN5vteJr3Rwbrl85QhzSZOdH+lXK/lV3cuTTAoEzxyff+gvEU1LRduztxETchAYiEhoXftCg9itea59MEPb0dg5LQIDAQAB",
+  "permissions": ["nativeMessaging"],
+  "host_permissions": ["http://127.0.0.1/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    { "matches": ["http://127.0.0.1/*"], "js": ["content.js"], "run_at": "document_idle" }
+  ]
+}
