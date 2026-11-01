@@ -85,10 +85,13 @@ internal sealed class VoiceProbe : IDisposable
     /// Feeds audio in 32 ms chunks, as a microphone would, and returns the speech it heard. The delay is how much audio
     /// had arrived after the last speech sample when the VAD closed the final segment (NaN if speech ran to the end).
     /// </summary>
+    /// <summary>Audio kept from before the VAD's trigger point: soft first sounds ("skip", "ouvre") start before it fires.</summary>
+    public double PreRollSeconds { get; init; } = 0.3;
+
     public Endpointed? Endpoint(VoiceActivityDetector vad, float[] audio)
     {
         vad.Reset();
-        var speech = new List<float>();
+        long first = -1, last = -1;
         var segments = 0;
         var delay = double.NaN;
         const int chunk = 512;
@@ -99,9 +102,10 @@ internal sealed class VoiceProbe : IDisposable
             while (!vad.IsEmpty())
             {
                 var segment = vad.Front();
-                speech.AddRange(segment.Samples);
+                first = first < 0 ? segment.Start : first;
+                last = segment.Start + segment.Samples.Length;
                 segments++;
-                delay = (end - (segment.Start + segment.Samples.Length)) * 1000.0 / AudioUtil.SampleRate;
+                delay = (end - last) * 1000.0 / AudioUtil.SampleRate;
                 vad.Pop();
             }
         }
@@ -109,13 +113,22 @@ internal sealed class VoiceProbe : IDisposable
         vad.Flush();
         while (!vad.IsEmpty())
         {
-            speech.AddRange(vad.Front().Samples);
+            var segment = vad.Front();
+            first = first < 0 ? segment.Start : first;
+            last = segment.Start + segment.Samples.Length;
             segments++;
             delay = double.NaN;
             vad.Pop();
         }
 
-        return segments == 0 ? null : new Endpointed([.. speech], segments, delay);
+        if (segments == 0)
+        {
+            return null;
+        }
+
+        // The utterance runs continuously from just before the first segment to the end of the last one.
+        var start = Math.Max(0, first - (long)(PreRollSeconds * AudioUtil.SampleRate));
+        return new Endpointed(audio[(int)start..(int)Math.Min(last, audio.Length)], segments, delay);
     }
 
     public (string Text, double Ms) Transcribe(float[] samples)

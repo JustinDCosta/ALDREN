@@ -119,6 +119,8 @@ Console probe in `spikes/S3.Voice` (sherpa-onnx 2.0.1, NAudio 3.3.0), CPU only, 
 | End of speech detected (Silero VAD, 400 ms hangover) | 400 ms after the last word | |
 | Speech recognition, Parakeet-TDT 0.6B v3 int8, 4 threads | 200 ms p50 for 1.9 s commands, 296 ms for a 2.9 s one (11% of real time) | ≤ 400 ms for 3–5 s utterances; this extrapolates to ~320–540 ms |
 | Recognition accuracy on clean synthetic speech | 8.9% word error rate, nearly all from words the TTS failed to say | Real target (≤ 10% English) uses your recordings |
+| Recognition on your voice (PD300X, 20 English commands) | 5.4% word error rate with 300 ms of audio kept from before the VAD fired (10.7% without: soft first sounds like "skip" were clipped; 2.7% on whole clips); 137 ms p50, 221 ms max | ≤ 10% English, ≤ 400 ms |
+| End of speech + recognition on your voice (p50) | 537 ms | |
 | First audio, Kokoro v1.1 int8, 2–6 threads | 2.3–2.9 s for a short reply, slower than real time; more threads don't help | ≤ 300 ms |
 | First audio, Kokoro v1.1 fp32, 4 threads | 655–680 ms for "Sure, boss.", 825–850 ms for "Opening Spotify now, boss." | ≤ 300 ms |
 | End of speech + recognition + first audio (CPU, fp32) | ~1.3 s for a short command and reply | ≤ 1.1 s |
@@ -129,7 +131,9 @@ Findings:
 - **int8 Kokoro is about 3.5× slower than fp32 on this CPU**, so the quantised model is the wrong choice here.
 - Recognition is fast enough on the CPU; text-to-speech is not, so it needs a decision before Phase 3: a phonemiser and Kokoro v1.0 for French and better English voices, the GPU for synthesis, and pre-recorded acknowledgements ("Sure, boss.") to cover the wait.
 
-Still to do, with you: word error rate on your recorded commands, the three microphones live, the unplug test ("Input device disappeared"), and the Bluetooth headset check.
+- **Keep audio from before the VAD fires.** The VAD opens a segment only once it is sure speech started, which cut the first sound of "skip" and "ouvre"; keeping 300 ms from before the trigger halved the English error rate. ALDREN's audio service needs a short ring buffer for this. French is 53% word error rate on these takes, which no longer matters: ALDREN is English-only.
+
+Still to do, with you: the three microphones live, the unplug test ("Input device disappeared"), and the Bluetooth headset check.
 
 ### The first recording session was unusable
 The 2026-10-31 session (112 takes on the PD300X) came out squeezed about 2× in time: speech spans were half their normal length and nothing could be transcribed, even though the levels were normal. Through PortAudio's WASAPI path, the PD300X (192 kHz, stereo) delivered one second of audio every 2.07 s, whatever rate or channel count was requested. NAudio reading WASAPI directly received the full 191.8 kHz, and the laptop microphone's 48 kHz arrived correctly, so the device is fine and PortAudio's WASAPI path is at fault. The recorder now captures through MME at 48 kHz (the Windows audio engine converts), times every read, refuses to start if a one-second self-test arrives at the wrong speed, and says "Speak now" only once capture is running. The session has to be redone; the old one is set aside as `2026-10-31-invalid-timing`. For Phase 3: ALDREN's audio service uses NAudio on WASAPI, which delivered correctly, and should time-check its capture the same way.
