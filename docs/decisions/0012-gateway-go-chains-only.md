@@ -32,6 +32,7 @@ On speed: the voice fast path is local and never touches the gateway (ADR-0004).
 - **Keep allowing pinned model names:** unsafe while resellers share model names, as S8 showed. FreeLLMAPI also has provider-specific model ids, but the chains make them unnecessary.
 
 ## Consequences
+- **Pinned release:** v0.16.14 (tag commit `5127fee51ba97ad112915ebe227ba13df461a266`), evaluated with your installed Node 24.20; Phase 6 pins a portable Node. Upgrades follow [SECURITY.md](../SECURITY.md#freellmapi-hardening-applied-by-aldren-at-launch): changelog review, a compatibility test and your OK.
 - **Phase 6** implements the drift check and the deadlines. S8's `aldren-bench gateway` stays as the regression test.
 - **Setup:** configuring the gateway stays a dashboard task for you. ALDREN's setup guide must say to click "Save changes" after editing a chain.
 - **Rate limits:** free tiers (Gemini allows about 10 requests a minute per model) need pacing or fallback in ALDREN, never a burst of retries.

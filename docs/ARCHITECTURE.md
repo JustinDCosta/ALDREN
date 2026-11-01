@@ -189,20 +189,20 @@ Escalation ladder: Quick (4B) → Action (same 4B + vision + tools) → local 9B
 
 Decision record: [ADR-0004](decisions/0004-local-inference.md).
 
-**Engine:** llama.cpp `llama-server`, pinned release, CUDA build. Router mode (on-demand load and unload) or ALDREN-managed processes, chosen in Phase 0. Loopback only, random API key.
+**Engine:** llama.cpp `llama-server`, pinned release (b12023 in Phase 0), CUDA build. ALDREN manages one server process per model and switches models by restarting it; Phase 0 found router mode slower and erratic. Loopback only, random API key.
 
 **Settings:** all layers on the GPU; flash attention; 8-bit KV cache; 8K context by default (16K when VRAM allows); JSON-schema-constrained output for routing and tool calls; a stable prompt prefix with cache reuse, with the warmed prompt state saved to disk and restored after reloads; vision projector on the GPU, or on the CPU under VRAM pressure (slower screenshots, ~0.7 GB saved); no speculative decoding.
 
-**Lineup** (provisional until Phase 0 spike S1):
+**Lineup** (chosen in Phase 0 spike S1; VRAM on top of the desktop's, projector included):
 
-| Role | Model | Where | Memory *(est.)* |
+| Role | Model | Where | Memory |
 |---|---|---|---|
-| Quick + Action (resident) | Qwen3.5-4B Q4_K_M + vision projector | GPU | 3.8–4.6 GB VRAM |
-| Deep local reasoning (on demand) | Qwen3.5-9B Q4_K_M (or Q3_K_M) | GPU, swapped in | ~5.5 GB VRAM |
-| Gaming / battery fallback | LFM2.5-1.2B or Qwen3.5-0.8B | CPU | ~1 GB RAM |
-| Embeddings (memory, intents) | EmbeddingGemma-300M | CPU (ONNX) | ~0.3 GB RAM |
+| Quick + Action (resident) | Qwen3.5-4B Q4_K_M + F16 vision projector | GPU | 3,856 MiB VRAM at 8K, 4,116 at 16K |
+| Deep local reasoning (on demand) | Qwen3.5-9B Q3_K_M | GPU, swapped in | 4,454 MiB VRAM at 8K |
+| Gaming / battery fallback (conversation only) | Qwen3.5-0.8B Q4_K_M | CPU | ~1 GB RAM *(est.)* |
+| Embeddings (memory, intents) | EmbeddingGemma-300M | CPU (ONNX) | ~0.3 GB RAM *(est.)* |
 
-Benchmarked alternatives: Qwen3.5-2B, Gemma 4 E2B/E4B, Granite 4.2 3B. GUI-grounding specialists (for example Step-GUI-4B) only if Qwen3.5's grounding proves insufficient.
+Benchmarked and not chosen: Qwen3.5-2B, Gemma 4 E2B, Granite 4.2 3B and LFM2.5-1.2B ([results](benchmarks/phase0.md#s1-local-models)). GUI-grounding specialists (for example Step-GUI-4B) only if Qwen3.5's grounding proves insufficient. S5 found it insufficient on dense windows, and [ADR-0013](decisions/0013-perception-names-first.md) (proposed) evaluates one in Phase 5.
 
 **VRAM budget:** ~770 MiB desktop + ~300–450 MiB CUDA runtime leaves ~4.9–5.1 GB for weights and KV cache, less while a game, OBS or video playback is running.
 
@@ -214,7 +214,7 @@ Benchmarked alternatives: Qwen3.5-2B, Gemma 4 E2B/E4B, Granite 4.2 3B. GUI-groun
 | Wake word heard while the model is cold | Start loading immediately (you're still speaking for 1–3 s) |
 | On battery, idle | Unload (a live CUDA context keeps the NVIDIA GPU awake) |
 | Fullscreen game, OBS, or VRAM pressure | Unload within seconds; CPU fallback model, or cloud fallback if allowed |
-| Hard task flagged | Swap to the 9B (~2–4 s *(est.)*), swap back when idle |
+| Hard task flagged | Swap to the 9B (~4.4 s in S1, shown as "thinking deeper"), swap back when idle |
 
 **Screenshots:** cropped to the relevant window and downscaled before the vision model; UIA and OCR come first, so most turns need no image at all.
 
@@ -288,8 +288,8 @@ Decision record: [ADR-0005](decisions/0005-voice-stack.md).
 **Wake word:** an openWakeWord-style model for "ALDREN":
 1. Synthetic positives from many TTS voices, with respellings (Aldren, Al-drin, All-drin), speeds and pitches.
 2. 50–100 of your recordings, captured with a Settings wizard (normal, tired, loud, across the room, with music or a game playing), plus a held-out set for testing.
-3. Negatives: generic speech and noise corpora, near-misses ("Aldrin", "Alden", "all then", "Darren", "children") and an hour of your own background audio.
-4. Augmentation with your microphones' characteristics, reverb and noise; training on your GPU *(est. 30–90 min)*.
+3. Negatives: generic speech and noise corpora, near-misses ("Alden", "all then", "Darren", "children"), your own background audio, and real false alarms from field runs. "Aldrin" sounds exactly like ALDREN as you say it, so it counts as the name.
+4. Augmentation with your microphones' characteristics, reverb and noise; training on the CPU (23 minutes in Phase 0).
 5. Evaluation: false wakes per hour on ≥10 h of your background audio; misses on held-out clips at 0.5–3 m; threshold choice.
 
 Targets: ≤0.5 false wakes per hour and ≥95% detection at desk distance, measured rather than promised. Runtime <1% CPU, a cooldown after each trigger, a sensitivity slider with a live meter, an optional voice-specific verifier and an optional second-stage transcript check (~150 ms).
@@ -324,6 +324,8 @@ Targets: ≤0.5 false wakes per hour and ≥95% detection at desk distance, meas
 | 6 | Cloud vision | — | Only with per-request consent (§8.4) |
 
 This hybrid follows the approach of Microsoft Research's UFO² Windows agent: UIA first, visual grounding for the gaps, and UIA checks before acting.
+
+Phase 0 (S5) measured this ladder on 30 of your windows: UI Automation took 478 ms p90, Windows OCR read 67% of the drawn labels, and the 4B model picked the right numbered box only 24% of the time among up to 60 ([results](benchmarks/phase0.md#s5-screen-perception)). [ADR-0013](decisions/0013-perception-names-first.md) proposes finding controls by name first and showing vision only a few candidates; this section changes once you approve it.
 
 - **Capture:** the Windows capture border stays visible by default as a "looking" indicator; ALDREN's own windows are excluded from capture.
 - **Actions** (typed): launch, focus or close an app; move, resize or snap a window; apply a layout; invoke an element; set text; select an item; scroll; allowlisted keyboard shortcuts; file operations; screenshot. Each is validated, permission-checked, confirmed when required, executed with a timeout and verified by re-observing. Elements are referenced by IDs from the latest snapshot; stale IDs are rejected. Pixel clicks are a flagged last resort after a fresh screenshot check, disabled in sensitive apps.

@@ -1,6 +1,6 @@
 # ADR-0010: Home detection by network identity, not Wi-Fi name
 
-- **Status:** Accepted (2026-10-31); to confirm in Phase 0 spike S7
+- **Status:** Accepted (2026-10-31); confirmed by Phase 0 spike S7 (2026-11-01), with the refinements below; the reboot checks are still to do, before Phase 4
 
 ## Context
 "Welcome back, boss." and away mute both depend on knowing that you are home.
@@ -30,6 +30,12 @@
 ## Consequences
 - Works on Ethernet and Wi-Fi without the location permission.
 - Spoofing a router's hardware address is possible, but the worst outcome is a greeting.
+
+## Phase 0 result
+Measured in S7 ([results](../benchmarks/phase0.md#s7-network-identity)):
+- **The router's identity is stable.** One fingerprint (network ID and gateway MAC, hashed) covers your Ethernet and your Wi-Fi, which reach the same router. Virtual adapters are recognised by Windows' hardware-interface flag rather than by name.
+- **Timing:** Home 1.6–1.7 s after a Wi-Fi reconnect; a phone hotspot read Away 1.9 s after connecting.
+- **Refinements:** while Windows identifies a network that just connected, the probe read Away for about 1.5 s, so ALDREN announces Home as soon as a fingerprint matches but Away only after ~3 s without a match. The gateway's MAC comes from the ARP cache or a bounded wait: on a dropped link, waiting for an ARP answer stalled the check for 3–4 s.
 
 ## Revisit if
 S7 shows the router's identity isn't stable on your network.

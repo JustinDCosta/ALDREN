@@ -2,6 +2,29 @@
 
 Measured on the target laptop (Acer Nitro AN515-57: Core i5-11400H, RTX 3060 Laptop 6 GB, 16 GB RAM, Windows 11), plugged in, on the High performance plan, with games and OBS closed. Raw output (results.json, summary.md, server logs) stays in `E:\AldrenData\bench` and is not committed.
 
+## Summary
+
+Phase 0 ran on 2026-10-31 and 2026-11-01. S1, S2, S5 and S8 answered their questions (S8 without two measurements, which are now due before Phase 6). S3, S6 and S7 each have one check left that needs you, and the wake word (S4) is still short of its target. Each open item moves to the phase that first depends on it (below).
+
+| Spike | Against the targets | Decision |
+|---|---|---|
+| S1 Local models | Qwen3.5-4B: first token 114 ms (target ≤ 400), 74.5 tokens/s (≥ 30), 3,856 MiB of VRAM at 8K (≤ 4.6 GB), routing 95% (≥ 90%), valid tool calls 96.7% (≥ 95%), screenshot answer 0.96 s (≤ 4 s). Missed: one injection case of 15 called a tool, and the switch to the 9B takes 4.4 s (≤ 4 s) | [ADR-0004](../decisions/0004-local-inference.md) confirmed: the 4B resident, the 9B by restart, Qwen3.5-0.8B on the CPU for conversation only |
+| S2 Island overlay | All 8 checks pass on both screens | [ADR-0002](../decisions/0002-winui3-ui.md) confirmed: WinUI 3, no WPF fallback |
+| S3 Voice chain | Recognition 5.4% word error rate (≤ 10%) in 137 ms (≤ 400 ms); first audio 213 ms with Supertonic 3 (≤ 300 ms); end of speech + recognition + first audio ~0.75 s (≤ 1.1 s). Left: the live microphone checks | [ADR-0011](../decisions/0011-supertonic-voice-english-only.md): Supertonic 3, English only; Parakeet and Silero confirmed ([ADR-0005](../decisions/0005-voice-stack.md)) |
+| S4 Wake word | Model 4: 3.7% of your held-out takes missed (≤ 5%), but ~16 false wakes per hour of your normal use (≤ 0.5), down from ~217 for model 3; 0.5% CPU (≤ 2%) | ADR-0005's approach stays while training continues; it must reach the target, or be revisited, before Phase 3 relies on it |
+| S5 Perception | UI Automation 478 ms p90 (≤ 500 ms; Explorer 648 ms); Windows OCR reads 67% of drawn labels (≥ 90%); the 4B picks the right numbered box 24% of the time (≥ 80%); 3.2 s p50 / 4.9 s p90 per question (≤ 4 s) | [ADR-0013](../decisions/0013-perception-names-first.md), proposed: find controls by name first, and give vision only a few candidates |
+| S6 Browser | Ping through Chrome 0.3 ms p90 (≤ 50 ms); read, click and fill work; injected instructions inert; passwords stay on the page. Left: the consent-based attach | [ADR-0009](../decisions/0009-browser-automation.md) confirmed for the extension and the separate profile |
+| S7 Network identity | Home 1.6–1.7 s after a Wi-Fi reconnect (≤ 2 s); one fingerprint covers Ethernet and Wi-Fi; a phone hotspot reads Away. Left: the reboot checks | [ADR-0010](../decisions/0010-home-away-detection.md) confirmed, with Away announced only after ~3 s |
+| S8 FreeLLMAPI | Tool calls 38/38 valid when answered (≥ 95%), schema output 20/20, 63/63 answers inside the requested chain, canary never stored, only the configured providers contacted; memory 101–103 MB (≤ 100 MB). Not measured: overhead and failover | [ADR-0012](../decisions/0012-gateway-go-chains-only.md): go with v0.16.14, curated chains only |
+
+Carried forward:
+- **Phase 2:** the llama-server client retries a request once when the server drops a keep-alive connection; the 15 injection cases become a regression test; the persona prompt needs shorter replies.
+- **Phase 3:** S3's live checks (each microphone, unplugging the PD300X, the Bluetooth headset). The wake word reaching its targets: retraining on model 4's field false alarms, more of your takes, and a transcript check biased toward the name. The classifier is saved as `.npz`; the C# runtime needs it as ONNX (the `onnx` package needs your approval) or as a small C# forward pass. A more natural voice ([ADR-0011](../decisions/0011-supertonic-voice-english-only.md)).
+- **Phase 4:** S7's reboot checks; Away after ~3 s without a match; the gateway's MAC from the ARP cache.
+- **Phase 5:** ADR-0013's candidate-list experiment, then a GUI-grounding model and a stronger OCR engine to evaluate (downloads that need your approval); scoped UI Automation snapshots for Explorer; the benchmark targets the roadmap leaves for after Phase 0.
+- **Phase 6:** the gateway's overhead (≤ 20 ms median) and in-chain failover (10/10), measured before the phase starts; the drift check, deadlines and ~15 s provider timeouts.
+- **Phase 7:** S6's consent-based attach; the extension installed by hand, since Chrome 156 ignores `--load-extension`.
+
 ## Pinned downloads
 
 Full URLs (commit-pinned for Hugging Face) are in [tools/setup/phase0-downloads.json](../../tools/setup/phase0-downloads.json); `tools/setup/fetch.ps1` verifies every file before use.
@@ -89,6 +112,7 @@ Restoring a saved prompt cache after a reload brought the 4B's first token from 
 - **Deep tier: Qwen3.5-9B Q3_K_M, switched by restarting llama-server.** Router mode was slower and erratic. The 9B's system-prompt cache is saved once and restored after each load. The hand-over takes about 4.4 s, slightly over the target, so the island shows a "thinking deeper" state while it happens.
 - **CPU fallback while gaming: Qwen3.5-0.8B, for conversation only.** Neither CPU model is accurate enough with tools (40% and 67% valid calls), so with the GPU unloaded only the deterministic fast path runs commands. LFM2.5-1.2B is out because of its 1.7 s first token.
 - **No thinking mode for the Quick Brain** (`--reasoning-budget 0` and `enable_thinking: false`): Qwen3.5 otherwise starts every reply with hidden reasoning.
+- **Not downloaded:** Gemma 4 E4B and Qwen3.5-9B Q4_K_M, which the plan held back unless results called for them. The 4B met its targets and the 9B Q3_K_M fits.
 
 ### Other findings
 
@@ -119,9 +143,9 @@ What it took, for Phase 3:
 - **Measuring smoothness:** `DwmGetCompositionTimingInfo` counted 50 refreshes where about 2,186 elapsed, so frame pacing comes from Windows Graphics Capture frame timestamps instead.
 - **Memory:** Task Manager's figure (private working set) is 35 MB; the total working set of 134 MB includes WinUI's shared DLL pages.
 
-## S3: voice pipeline (in progress)
+## S3: voice pipeline
 
-Console probe in `spikes/S3.Voice` (sherpa-onnx 2.0.1, NAudio 3.3.0), CPU only, and nothing is ever played through the speakers. Measured so far without a microphone: text-to-speech timing, and the VAD → speech-recognition path on commands spoken by the TTS voice. Raw output is in `E:\AldrenData\bench\s3`.
+Console probe in `spikes/S3.Voice` (sherpa-onnx 2.0.1, NAudio 3.3.0), CPU only, and nothing is ever played through the speakers. Measured without a live microphone: text-to-speech timing, and the VAD → speech-recognition path on commands spoken by the TTS voice and on your recorded commands. Raw output is in `E:\AldrenData\bench\s3`.
 
 | Measure | Result | Target |
 |---|---|---|
@@ -161,9 +185,9 @@ First audio for typical replies, CPU, 4 threads (6 threads is slower), median of
 
 - **Keep audio from before the VAD fires.** The VAD opens a segment only once it is sure speech started, which cut the first sound of "skip" and "ouvre"; keeping 300 ms from before the trigger halved the English error rate. ALDREN's audio service needs a short ring buffer for this. French is 53% word error rate on these takes, which no longer matters: ALDREN is English-only.
 
-Still to do, with you: the three microphones live, the unplug test ("Input device disappeared"), and the Bluetooth headset check.
+Still to do, with you, before Phase 3: the three microphones live, the unplug test ("Input device disappeared"), and the Bluetooth headset check.
 
-## S4: wake word (in progress)
+## S4: wake word
 
 Tools in `tools/wakeword-trainer` (`aldren-synth`, `aldren-train`, `aldren-eval`, `aldren-listen`). Training data:
 - **Synthetic:** 40,000 clips from Piper's LibriTTS-R model (904 speakers), fed hand-written phonemes. sherpa-onnx 2.0 has no phonemiser, and Supertonic mispronounced the name ("Al drum", "Bildroll"). Parakeet heard "Aldrin" in 21 of 30 random wake-word clips. "Aldrin" sounds exactly like ALDREN as you say it, so it is a positive, not a near miss.
@@ -186,9 +210,9 @@ Findings so far:
 - The transcript check never confirmed a command, but Parakeet hears your "ALDREN" as "children", "already", "El dream" or nothing in a third of takes, so it can't simply be bolted on.
 - Next, as the plan prescribes: the field test with model 3 at threshold 0.9. Every trigger is saved as a 2 s clip with its transcript, then the model is retrained with those real false alarms as negatives. More of your takes (another ~200) and a hotword-biased transcript check are the next levers if that isn't enough.
 
-### Field test so far (model 3, threshold 0.9)
+### Field test on model 3 (threshold 0.9)
 
-3.8 h of listening during your normal use on 2026-11-01:
+The first 3.8 h of listening during your normal use on 2026-11-01, which model 4 was then trained on:
 
 | Measure | Result | Target |
 |---|---|---|
@@ -210,10 +234,24 @@ The scores leave no threshold to hide behind: half of the false wakes scored ≥
 
 Model 4 is better on every measure but still ~25× over the false-wake target on general audio. Offline scoring also undercounts: live, model 3 fired on all of these clips, and offline on 58. Only a field run on model 4 gives its real rate.
 
+### Field run on model 4 (threshold 0.95)
+
+Your normal use on 2026-11-01 from 16:16, compared with model 3's whole field run:
+
+| Measure | Model 3 (0.9) | Model 4 (0.95) | Target |
+|---|---|---|---|
+| Listening | 4.4 h | 4.2 h | ≥ 10 h |
+| False wakes | 955 (~217 per hour) | 68 (~16 per hour) | ≤ 0.5 per hour |
+| Confirmed by the transcript check | none | none | |
+| With an empty transcript (sound, not speech) | 501 | 25 | |
+| CPU | 0.5% | 0.45% | ≤ 2% |
+
+Retraining on real false alarms cut them about 13-fold, but model 4 is still ~30× over the target, so the wake word isn't usable yet. Next: retrain with model 4's own false alarms once it has more field hours, add more of your takes, and test a transcript check biased toward the name. The listener keeps running in the terminal tab "wake-word field test (model 4)".
+
 ### The first recording session was unusable
 The 2026-10-31 session (112 takes on the PD300X) came out squeezed about 2× in time: speech spans were half their normal length and nothing could be transcribed, even though the levels were normal. Through PortAudio's WASAPI path, the PD300X (192 kHz, stereo) delivered one second of audio every 2.07 s, whatever rate or channel count was requested. NAudio reading WASAPI directly received the full 191.8 kHz, and the laptop microphone's 48 kHz arrived correctly, so the device is fine and PortAudio's WASAPI path is at fault. The recorder now captures through MME at 48 kHz (the Windows audio engine converts), times every read, refuses to start if a one-second self-test arrives at the wrong speed, and says "Speak now" only once capture is running. The session has to be redone; the old one is set aside as `2026-10-31-invalid-timing`. For Phase 3: ALDREN's audio service uses NAudio on WASAPI, which delivered correctly, and should time-check its capture the same way.
 
-## S5: screen perception (in progress)
+## S5: screen perception
 
 Console probe in `spikes/S5.Perception` (FlaUI.UIA3 5.0.0, Windows OCR, Windows Graphics Capture, Qwen3.5-4B with its projector on the GPU). Everything stays on the PC; captures go to `E:\AldrenData\bench\s5`.
 - `capture`: Ctrl+Alt+S saves the window you're in (screenshot plus its UI Automation tree: interactive controls and text labels with their bounds), Ctrl+Alt+Q stops.
@@ -268,7 +306,7 @@ Notes for Phase 5:
 - A stronger OCR engine is worth an evaluation (it's a download, so it needs your approval first).
 - Explorer's 648 ms p90 needs a scoped snapshot (the focused pane, not every row).
 
-## S6: browser bridge (in progress)
+## S6: browser bridge
 
 Prototype in `spikes/S6.BrowserBridge`: a Manifest V3 extension, a native-messaging host in C#, a test page and a Playwright console (Microsoft.Playwright 1.64.1, driving the installed Chrome 156; no Playwright browsers downloaded). `run-s6.ps1` walks through the session that needs you.
 - **Extension:** asks for `nativeMessaging` and `http://127.0.0.1/*` only, so its page script can't run on real sites. A fixed public key in the manifest pins its ID (`mhipkigoofdhdiigilekjfpkhemnjajm`), which the host manifest allows and nothing else. It lives in the separate test profile, not your everyday Chrome.
@@ -290,7 +328,7 @@ Notes for Phase 7: clicks from a page script are synthetic (`isTrusted` is false
 
 Still to do, with you: the CDP part only. Close the test-profile window, run `CdpAttach profile`, turn remote debugging on, run `CdpAttach attach` and approve Chrome's prompt, then turn it off again.
 
-## S7: network identity (in progress)
+## S7: network identity
 
 Console probe in `spikes/S7.Network`. A network's fingerprint is the SHA-256 of Windows' network ID (Network List Manager) and the gateway's MAC address (`GetBestRoute2` then `ResolveIpNetEntry2`); only the hashes are stored, in `E:\AldrenData\bench\s7\home.json`. Home if any physical network matches, Away if physical networks are up and none matches, Unknown with none (offline, still identifying, or only a VPN up).
 - `snapshot`: connected networks with adapter, gateway, Wi-Fi name (if Windows allows) and the state.

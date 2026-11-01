@@ -2,7 +2,7 @@
 
 A local-first, JARVIS-inspired personal AI assistant for Windows 11. You summon it by saying "ALDREN" (pronounced *al-drin*) or by typing. It talks naturally, operates your apps, windows, files and browser through a safety-checked automation layer, understands your screen, manages reminders and your Google calendar, researches online when asked, and helps you focus.
 
-> **Status:** architecture approved on 2026-10-31. No code yet; Phase 0 (prototypes and benchmarks) is next. See [docs/STATUS.md](docs/STATUS.md).
+> **Status:** architecture approved on 2026-10-31. Phase 0 (prototypes and benchmarks) is done and its results await review; Phase 1 (foundation) is next. See [docs/STATUS.md](docs/STATUS.md).
 
 ## Design in one minute
 
@@ -20,11 +20,12 @@ A local-first, JARVIS-inspired personal AI assistant for Windows 11. You summon 
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Phases 0–9, deliverables and exit criteria |
 | [docs/STATUS.md](docs/STATUS.md) | What is planned, implemented, tested, partially working or blocked |
 | [docs/plans/phase-0.md](docs/plans/phase-0.md) | Phase 0 plan: prototypes and benchmarks |
+| [docs/benchmarks/phase0.md](docs/benchmarks/phase0.md) | Phase 0 results: measurements on this laptop and the decisions they led to |
 | [docs/SECURITY.md](docs/SECURITY.md) | Threat model, permissions, risk tiers, hardening |
 | [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) | Honest limits of the hardware, models and services |
 | [docs/decisions/](docs/decisions/README.md) | Architecture decision records: why each major choice was made |
 
-Setup and testing instructions will be added in Phases 0 and 1, when there is something to set up and test.
+Setup and testing instructions arrive with Phase 1, when ALDREN itself has something to install. The Phase 0 prototypes are described, with how they were run, in the results.
 
 ## Technology (planned)
 

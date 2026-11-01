@@ -1,6 +1,6 @@
 # ADR-0009: Chrome extension first, Playwright on demand, UI Automation fallback
 
-- **Status:** Accepted (2026-10-31); to confirm in Phase 0 spike S6
+- **Status:** Accepted (2026-10-31); the extension channel and the separate automation profile confirmed by Phase 0 spike S6 (2026-11-01); the consent-based attach is still to check, before Phase 7
 
 ## Context
 ALDREN must read and operate pages in your everyday Chrome, with your logins.
@@ -25,6 +25,13 @@ ALDREN must read and operate pages in your everyday Chrome, with your logins.
 
 ## Consequences
 - An extension to build and keep loaded (unpacked). Locking it against being disabled may require publishing it to the Chrome Web Store; this will be evaluated with focus mode in Phase 8.
+
+## Phase 0 result
+Measured in S6 ([results](../benchmarks/phase0.md#s6-browser-bridge)):
+- **Channel A:** through Chrome, the extension and its native-messaging host answered a ping in 0.3 ms p90 (target 50 ms), and read, click and fill took 1–1.5 ms. Password values never left the page, injected instructions on the test page triggered nothing, and the host refused anything but its four commands.
+- **Channel B, separate profile:** Playwright drove the installed Chrome 156 on its own profile (454 ms to launch headless, a click in 114 ms), with no browser downloaded.
+- **Channel B, attach to your Chrome:** not checked yet; it needs your steps.
+- **Installing the extension:** Chrome 156 ignored `--load-extension`, so the extension is loaded by hand (Developer mode) or published. Its clicks are synthetic (`isTrusted` is false) and some sites ignore them; Playwright's input is real.
 
 ## Revisit if
 Chrome changes its extension or debugging policies, or S6 shows consent-based attach is impractical.
