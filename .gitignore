@@ -53,6 +53,8 @@ voice-data/
 *.pfx
 *.snk
 secrets/
+# Source code, not secret values.
+!src/Aldren.Security/Secrets/
 
 # --- Phase 0 and benchmark scratch output ---
 spikes/**/output/
