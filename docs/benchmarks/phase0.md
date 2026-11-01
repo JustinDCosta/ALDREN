@@ -184,3 +184,31 @@ Findings so far:
 
 ### The first recording session was unusable
 The 2026-10-31 session (112 takes on the PD300X) came out squeezed about 2× in time: speech spans were half their normal length and nothing could be transcribed, even though the levels were normal. Through PortAudio's WASAPI path, the PD300X (192 kHz, stereo) delivered one second of audio every 2.07 s, whatever rate or channel count was requested. NAudio reading WASAPI directly received the full 191.8 kHz, and the laptop microphone's 48 kHz arrived correctly, so the device is fine and PortAudio's WASAPI path is at fault. The recorder now captures through MME at 48 kHz (the Windows audio engine converts), times every read, refuses to start if a one-second self-test arrives at the wrong speed, and says "Speak now" only once capture is running. The session has to be redone; the old one is set aside as `2026-10-31-invalid-timing`. For Phase 3: ALDREN's audio service uses NAudio on WASAPI, which delivered correctly, and should time-check its capture the same way.
+
+## S5: screen perception (in progress)
+
+Console probe in `spikes/S5.Perception` (FlaUI.UIA3 5.0.0, Windows OCR, Windows Graphics Capture, Qwen3.5-4B with its projector on the GPU). Everything stays on the PC; captures go to `E:\AldrenData\bench\s5`.
+- `capture`: Ctrl+Alt+S saves the window you're in (screenshot plus its UI Automation tree: interactive controls and text labels with their bounds), Ctrl+Alt+Q stops.
+- `analyze`: UI Automation time and coverage, OCR time, and how often OCR reads the UIA text labels, per app.
+- `ground [--n 5]`: up to n named controls per capture, asked two ways: pick the numbered box (boxes drawn from the UIA bounds) and point at the plain screenshot. The UIA bounds are the ground truth, so nothing needs labelling.
+- `selftest`: the whole pipeline on a window of its own, shown for about a second in a child process.
+
+The selftest is one 666×393 window with 13 controls. It checks the pipeline; the measurement needs your captures.
+
+| Measure | Selftest | Target |
+|---|---|---|
+| UI Automation snapshot | 144 ms (13 interactive elements, 9 text labels) | p90 ≤ 500 ms |
+| OCR | 20 ms, reads 9 of 9 text labels | ≥ 90% on English UI text |
+| Screenshot against UIA coordinates | within 1.2 px | |
+| Numbered boxes | 8/9: missed the 22-px window icon ("System") | ≥ 80% |
+| Raw coordinates | 6/9: put Minimize and Maximize on Close, the window icon on Settings | reported |
+| Latency per question | 538 ms p50, 673 ms p90 | ≤ 4 s |
+
+Findings so far:
+- **FlaUI 5 cache requests default to `AutomationElementMode.None`.** An element fetched while a cache is active holds only cached values, and searching from it fails with E_FAIL. The window is fetched outside the cache and its descendants in one cached batch, which is the part that needs the speed.
+- **Asked for "x,y", the 4B model answers in prose** ("in the top-right corner of the window") and ran past the token limit. Asked in Qwen's JSON point format (`[{"point_2d": [x, y]}]`, 0–1000 scale) it answers in about 20 tokens.
+- **OCR is checked against UIA Text elements, not control names.** Icon-only buttons (window controls, toolbars) have names but no visible text, so control names measured how many icons a window has.
+- **A hardware-rendered WPF window drew nothing on this laptop:** Windows Graphics Capture and `PrintWindow` both saw an empty client area while UI Automation listed its buttons. With software rendering it draws. Not investigated further: ALDREN's UI is WinUI 3, which rendered fine in S2, and none of the apps on the capture list use WPF.
+- Windows OCR has English and French installed.
+
+Still to do, with you: about 30 captures across Chrome, VS Code, Explorer, Discord, Steam and an error dialog, then `analyze` and `ground`.
