@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-02 · Current phase: **Phase 1, foundation (Tasks 1–4 done, starting Task 5)**. Phase 0 results approved on 2026-11-01
+Last updated: 2026-11-02 · Current phase: **Phase 1, foundation (Tasks 1–5 done, starting Task 6)**. Phase 0 results approved on 2026-11-01
 
 Labels: **Planned** · **In progress** · **Implemented** (code written, not yet verified) · **Tested** (verified on the target laptop) · **Partially working** · **Blocked** (external requirement)
 
@@ -30,7 +30,7 @@ Labels: **Planned** · **In progress** · **Implemented** (code written, not yet
 | S7 network identity probe | 0 | In progress | One fingerprint covers your Ethernet and Wi-Fi; Home in 1.6–1.7 s after a Wi-Fi reconnect, and the hotspot reads Away. Each reconnect briefly reads Away while Windows identifies the network, so ALDREN will debounce Away. Left, before Phase 4: the reboot checks |
 | S8 FreeLLMAPI gateway evaluation | 0 | Tested | Go ([ADR-0012](decisions/0012-gateway-go-chains-only.md)): tool calls 38/38 valid when answered, schema 20/20, 63/63 answers from a provider in the requested chain (the bench now also checks the model), canary never stored, only Groq, Google and OpenRouter contacted. Chains only (a bare model name reached two resellers); overhead and failover move to Phase 6's entry conditions |
 | Core and App processes, IPC, tray, startup, configuration, logging | 1 | In progress | Task 1: solution scaffolding builds with 0 warnings, locked restore, `tools/dev/publish-local.ps1` publishes to `E:\AldrenData\dev\aldren`; packages in [DEPENDENCIES.md](DEPENDENCIES.md). Task 2: shared building blocks in `Aldren.Common` (paths, restart backoff, single instance, redacted logging, hotkey parsing and fallback, island placement), checked by hand against the plan's expected values. Task 3: IPC contracts and the current-user-only pipe; a manual check on a real pipe passed the five planned cases (calls both ways, cancellation, disconnect, second client refused) |
-| Tool Gateway, permissions, audit log | 1 | In progress | Task 4: permission catalog and store (atomic writes, corrupt file set aside, newer file left untouched), checked by hand against the six planned cases |
+| Tool Gateway, permissions, audit log | 1 | In progress | Task 4: permission catalog and store (atomic writes, corrupt file set aside, newer file left untouched), checked by hand against the six planned cases. Task 5: risk tiers, typed tools, strict argument binder with exported schema, tool registry; checked by hand against the nine planned cases |
 | Local inference and residency manager | 2 | Planned | Models chosen in S1; the llama-server client must retry dropped keep-alive connections |
 | Orchestrator, fast path, router, persona | 2 | Planned | |
 | App launcher and basic system tools | 2 | Planned | |
