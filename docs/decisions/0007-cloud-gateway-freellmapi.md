@@ -1,6 +1,6 @@
 # ADR-0007: FreeLLMAPI as an optional, hardened cloud gateway, with an ALDREN Cloud Policy Layer
 
-- **Status:** Accepted (2026-10-31); go/no-go in Phase 0 spike S8
+- **Status:** Accepted (2026-10-31); S8 go recorded in [ADR-0012](0012-gateway-go-chains-only.md) (2026-11-01), which also drops pinned models
 - **Supersedes:** the ALDREN-built multi-provider Model Hub from the v1 plan
 
 ## Context

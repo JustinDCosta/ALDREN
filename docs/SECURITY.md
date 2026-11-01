@@ -59,7 +59,8 @@ You grant permissions in Settings, per capability (for example files: read-only 
 | Secret | Passwords, keys, tokens, card numbers, ID numbers | Never leaves the PC |
 
 Gateway rules:
-- ALDREN uses only curated `auto:aldren-*` chains or pinned models. Never plain `auto`, `auto:<strategy>` or Fusion, and never keyless, community or unvetted relay providers.
+- ALDREN sends only its curated `auto:aldren-*` chain ids, never bare model names: in S8 a bare `gemini-2.5-flash` went to two resellers ([ADR-0012](decisions/0012-gateway-go-chains-only.md)). Never plain `auto`, `auto:<strategy>` or Fusion, and never keyless, community or unvetted relay providers.
+- The gateway keeps enabled keys only for the providers ALDREN uses. A read-only drift check at every start compares chain contents and enabled keys with the allowlists.
 - After each response, ALDREN compares `X-Routed-Via` (and `X-Fallback-Trail`) with the chain's allowlist. A mismatch blocks that chain and alerts you.
 - A visible indicator shows whenever a request goes to the cloud.
 

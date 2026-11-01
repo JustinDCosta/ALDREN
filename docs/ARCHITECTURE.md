@@ -235,16 +235,17 @@ Created empty, with automatic additions off, by the setup wizard; edited in the 
 |---|---|---|
 | `aldren-fast` | Fast cloud fallback | Groq, Cerebras |
 | `aldren-reason` | Harder reasoning and planning | Gemini Flash, gpt-oss-120b on Groq or Cerebras, Mistral |
-| `aldren-vision` | Optional image understanding | Gemini Flash, Llama 4 Scout on Groq |
+| `aldren-vision` | Optional image understanding | Gemini Flash; Llama 4 Scout only if a first-party provider offers it (in S8 only Cloudflare and a reseller did) |
 | `aldren-research` | Research synthesis from public sources | Gemini Flash, larger free models via OpenRouter or Groq |
 
 Default allowed providers: Gemini (your key), Groq, Cerebras, Mistral, OpenRouter, GitHub Models (first-party only). Excluded: keyless, community and anonymous providers, unvetted relays, and Cohere (its terms forbid personal use). NVIDIA NIM only if you accept its evaluation-only terms.
 
 ### 8.3 Cloud Policy Layer (ALDREN)
-- **Role → chain mapping**, or a pinned model. Never plain `auto`, `auto:<strategy>` or Fusion.
+- **Role → chain mapping.** ALDREN sends only its curated `auto:aldren-*` chain ids, never a bare model name, which can resolve to a reseller selling a model by that name ([ADR-0012](decisions/0012-gateway-go-chains-only.md)). Never plain `auto`, `auto:<strategy>` or Fusion.
+- **Drift check:** at every start, each chain's contents and the gateway's enabled keys are compared (read-only) with ALDREN's allowlists; cloud use stays off until a mismatch is fixed.
 - **Privacy classes and egress gate:** see [SECURITY.md](SECURITY.md#cloud-egress).
 - **Consent:** per request for sensitive content, with a preview of exactly what leaves the PC; per-session options where you choose them.
-- **Deadlines** (first-token defaults, tuned in Phase 6): `aldren-fast` 2.5 s, `aldren-reason` 10 s, `aldren-vision` 15 s, `aldren-research` 20 s. On expiry, ALDREN cancels and falls back to local or tells you.
+- **Deadlines** (first-token defaults, tuned in Phase 6): `aldren-fast` 2.5 s, `aldren-reason` 10 s, `aldren-vision` 15 s, `aldren-research` 20 s. On expiry, ALDREN cancels and falls back to local or tells you. The gateway runs with provider timeouts of about 15 s, so a hung provider fails over instead of holding a request for its 60 s default.
 - **Routing verification:** after each response, `X-Routed-Via` and `X-Fallback-Trail` are compared with the chain's allowlist; a mismatch blocks the chain and alerts you.
 - **Attribution and audit:** provider, model, failed attempts, latency and tokens are recorded per request and shown in the UI.
 - **Cost:** the gateway counts tokens but doesn't price them. For paid keys, ALDREN estimates cost from token counts and a price table and enforces your budget.

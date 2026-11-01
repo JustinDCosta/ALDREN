@@ -318,7 +318,7 @@ Notes for Phase 4:
 
 Still to do, with you: the 2 reboots on each adapter with a `snapshot` afterwards (expect Home), if they weren't done.
 
-## S8: FreeLLMAPI gateway (in progress)
+## S8: FreeLLMAPI gateway
 
 FreeLLMAPI v0.16.14 lives in `E:\AldrenData\gateway\freellmapi-0.16.14`, outside this repo (it ships its own Claude Code hooks, which never get loaded here). `npm ci` installed its 964 locked packages from registry.npmjs.org; only four run install scripts (better-sqlite3's prebuilt binary, esbuild, msw, and fsevents, which is skipped on Windows). `spikes/S8.Gateway/start-gateway.ps1` launches it in the background and `stop-gateway.ps1` stops it. `aldren-bench gateway` runs the plan's checks (a)–(l) and appends to `E:\AldrenData\bench\s8\results.md`.
 
@@ -393,7 +393,7 @@ ADR-0007's revisit triggers are unacceptable overhead, unreliable tool calling, 
 - **Security holds:** loopback only, foreign Host refused, the canary was never stored, 63 of 63 answers from inside the requested chain, and only configured providers contacted. The one real risk is configuration, not a hole in the gateway: a model name can resolve to a reseller.
 - **Still open:** overhead (d) and failover (e) weren't measured, and memory is 1–3 MB over target.
 
-Recommendation, for your decision: **go**, on four conditions:
+**Decision: go** ([ADR-0012](../decisions/0012-gateway-go-chains-only.md), 2026-11-01; you left the call to the project), on four conditions:
 1. ALDREN uses its curated chains only, never bare model names.
 2. The gateway holds keys only for providers ALDREN uses, and the start-up drift check verifies chain contents and enabled keys.
 3. Client-side deadlines, with a provider timeout of about 15 s.
