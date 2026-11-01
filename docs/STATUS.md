@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-01 · Current phase: **Phase 1, foundation (plan awaiting your approval)**. Phase 0 results approved on 2026-11-01
+Last updated: 2026-11-01 · Current phase: **Phase 1, foundation (approved, starting Task 1)**. Phase 0 results approved on 2026-11-01
 
 Labels: **Planned** · **In progress** · **Implemented** (code written, not yet verified) · **Tested** (verified on the target laptop) · **Partially working** · **Blocked** (external requirement)
 
@@ -13,7 +13,7 @@ Labels: **Planned** · **In progress** · **Implemented** (code written, not yet
 | Git repository | Implemented | Phase 0 work is on `main` (the `phase-0` branch was fast-forwarded into it on 2026-11-01) |
 | Phase 0 plan | Approved | 2026-10-31, [plans/phase-0.md](plans/phase-0.md) |
 | Phase 0 results | Approved | 2026-11-01, [summary](benchmarks/phase0.md#summary); ADR-0013 accepted. Open checks moved to the phases that need them (below) |
-| Phase 1 plan | Implemented | Awaiting your approval: [plans/phase-1.md](plans/phase-1.md). Nothing is downloaded or changed before you approve it |
+| Phase 1 plan | Approved | 2026-11-02, [plans/phase-1.md](plans/phase-1.md); tests only for the Tool Gateway (your decision) |
 
 ## Features by phase
 
@@ -57,7 +57,7 @@ Labels: **Planned** · **In progress** · **Implemented** (code written, not yet
 | Installer, updates, soak testing | 9 | Planned | |
 
 ## Waiting on you
-- Review and approve (or change) the [Phase 1 plan](plans/phase-1.md), including its package list and system changes.
+- Nothing for Phase 1 until its acceptance steps.
 - S4: leave the model 4 field listener running (since 2026-11-01 16:16, in the terminal tab "wake-word field test (model 4)") during normal use; its false alarms feed the next retrain.
 - Before Phase 3, S3: a short live test on each microphone, unplugging the PD300X mid-capture once, and the Bluetooth headset check.
 - Before Phase 4, S7: after 2 reboots on each adapter, `S7.Network.exe snapshot` (skip if done: reboots don't show in the watch log).
