@@ -185,6 +185,19 @@ Findings so far:
 - The transcript check never confirmed a command, but Parakeet hears your "ALDREN" as "children", "already", "El dream" or nothing in a third of takes, so it can't simply be bolted on.
 - Next, as the plan prescribes: the field test with model 3 at threshold 0.9. Every trigger is saved as a 2 s clip with its transcript, then the model is retrained with those real false alarms as negatives. More of your takes (another ~200) and a hotword-biased transcript check are the next levers if that isn't enough.
 
+### Field test so far (model 3, threshold 0.9)
+
+3.8 h of listening during your normal use on 2026-11-01:
+
+| Measure | Result | Target |
+|---|---|---|
+| False wakes | 704 (183 per hour, 244 per hour in the busiest 2.5 h) | ≤ 0.5 per hour |
+| Confirmed by the transcript check | none | |
+| False wakes with an empty transcript (sound, not speech) | 384 | |
+| CPU | 0.5% | ≤ 2% |
+
+The scores leave no threshold to hide behind: half of the false wakes scored ≥ 0.98, and 102 scored ≥ 0.999. Model 3 learned "your microphone and room" more than "ALDREN". The 704 clips are the real false alarms the plan retrains with, so the retrain doesn't need the full 10 hours first. The remaining field hours then measure the retrained model.
+
 ### The first recording session was unusable
 The 2026-10-31 session (112 takes on the PD300X) came out squeezed about 2× in time: speech spans were half their normal length and nothing could be transcribed, even though the levels were normal. Through PortAudio's WASAPI path, the PD300X (192 kHz, stereo) delivered one second of audio every 2.07 s, whatever rate or channel count was requested. NAudio reading WASAPI directly received the full 191.8 kHz, and the laptop microphone's 48 kHz arrived correctly, so the device is fine and PortAudio's WASAPI path is at fault. The recorder now captures through MME at 48 kHz (the Windows audio engine converts), times every read, refuses to start if a one-second self-test arrives at the wrong speed, and says "Speak now" only once capture is running. The session has to be redone; the old one is set aside as `2026-10-31-invalid-timing`. For Phase 3: ALDREN's audio service uses NAudio on WASAPI, which delivered correctly, and should time-check its capture the same way.
 
@@ -214,7 +227,34 @@ Findings so far:
 - **A hardware-rendered WPF window drew nothing on this laptop:** Windows Graphics Capture and `PrintWindow` both saw an empty client area while UI Automation listed its buttons. With software rendering it draws. Not investigated further: ALDREN's UI is WinUI 3, which rendered fine in S2, and none of the apps on the capture list use WPF.
 - Windows OCR has English and French installed.
 
-Still to do, with you: about 30 captures across Chrome, VS Code, Explorer, Discord, Steam and an error dialog, then `analyze` and `ground`.
+### Your 30 captures (2026-11-01)
+
+Explorer 12, Chrome 10, Epic Games Launcher 3, and one each of Steam, VS Code, PowerShell, Discord and Claude. No error dialog came up.
+
+| Measure | Result | Target |
+|---|---|---|
+| UI Automation snapshot | 478 ms p90 overall; Chrome 325 ms; Explorer 648 ms (a median 337 named controls per window) | p90 ≤ 500 ms |
+| Named interactive controls exposed | Chrome 99, Explorer 337 (medians); VS Code 4, Claude 4; Discord, Steam and Epic 0 | |
+| OCR time | 120 ms p90 (185 ms with the CPU busy training) | |
+| OCR reads the UIA text labels drawn in the capture | 67.0% (376 of 561; 61.7% before leaving out the 48 labels UI Automation reports but nothing draws) | ≥ 90% on English UI text |
+| Numbered boxes: the 4B model picks the named control's box (up to 60 boxes on the full-size capture; 24 captures had controls, 5 questions each) | 24.2% of 120 | ≥ 80% |
+| Raw coordinates: the 4B model points at the control on the plain capture | 29.2% of 120 | reported |
+| Latency per question | 3.2 s p50, 4.9 s p90 | ≤ 4 s |
+| Same questions, images scaled to 1280 px wide | numbered boxes 15.0%, raw coordinates 21.7%; 1.8 s p50, 3.4 s p90 | |
+
+The scaled run tested whether the vision encoder shrinks large captures until the number tags blur. It doesn't: smaller images did worse, and more pixels help a little. The 4B model can't pick a named control out of dozens of boxes on a dense real window, and pointing does no better.
+
+What the OCR number is and isn't:
+- **Not a coordinate problem:** where OCR found a label's first word, it sat 1–4 px right of the box's edge (text padding) and 0 px off vertically, never outside the box.
+- **Not text size or script:** box heights are the same for read and missed labels (medians 19–22 px), and no missed label has non-Latin letters. Accents explain nothing either.
+- **Upscaling barely helps:** reading a 2× upscale gets 68.5% for 2.5× the time (245 ms p90).
+- **What's left:** 95 drawn labels where OCR reads nothing (76 in Chrome, 19 in Explorer), and 90 that read as different text (51 in Explorer, 39 in Chrome). Windows OCR alone can't stand in for UI Automation's names.
+
+Notes for Phase 5:
+- UI Automation is the primary source wherever it exists: fast, exact, and with the boxes that make the numbered overlay work. A request like "click Save" should resolve by matching names first. The vision model only picks among a handful of matching candidates, which is the case this test didn't cover, and it's the next experiment. A larger model (the 9B deep tier) or a GUI-grounding model are the fallbacks to evaluate.
+- The Electron and CEF apps (Discord, Steam, Epic, VS Code, Claude) expose almost nothing, so for them ALDREN needs either their accessibility trees switched on, or vision on the raw screenshot.
+- A stronger OCR engine is worth an evaluation (it's a download, so it needs your approval first).
+- Explorer's 648 ms p90 needs a scoped snapshot (the focused pane, not every row).
 
 ## S6: browser bridge (in progress)
 
@@ -230,12 +270,13 @@ Measured so far, without you:
 | Host relay, with this PC standing in for the extension | 0.10 ms p90 per round trip; `exec` and malformed lines refused and never forwarded; host exits 2 ms after Chrome disconnects | |
 | Page script on the test page (run in a browser tab, outside the extension) | 8 controls found with labels; click, fill and submit logged by the page; password value null and refused for filling; the injected instructions come back as text and nothing acts on them | |
 | Separate profile through Playwright | installed Chrome started on `E:\AldrenData\browser-profile` in 454 ms (headless); a Playwright click (real input events, unlike the page script's synthetic clicks) logged by the page in 114 ms | |
-| Ping through Chrome and the extension | waiting for your session | p90 ≤ 50 ms |
-| CDP attach to your running Chrome (`chrome://inspect/#remote-debugging`, with Chrome's approval prompt) | waiting for your session | |
+| Ping through Chrome and the extension (your session, 2026-11-01) | 0.3 ms p90 (0.2 ms p50, 0.7 ms max over 100) | p90 ≤ 50 ms |
+| Read, click and fill through Chrome | page read in 1.3 ms (8 controls), click 1.1 ms, fill 1.5 ms per field; the password value never left the page; the injected instructions triggered nothing; `exec` refused by the host | |
+| CDP attach to your running Chrome (`chrome://inspect/#remote-debugging`, with Chrome's approval prompt) | not recorded: the run didn't get through it (the test-profile window was still open, which also blocks the windowed profile run) | |
 
 Notes for Phase 7: clicks from a page script are synthetic (`isTrusted` is false), and some sites ignore them; Playwright's are real input events. On Chrome 156 an extension passed with `--load-extension` never started, even with the `DisableLoadExtensionCommandLineSwitch` feature turned off (no service worker among the browser's targets), so the companion extension gets installed by hand or published, not sideloaded.
 
-Still to do, with you: `run-s6.ps1` (load the extension in the test profile, approve one remote-debugging prompt, then remote debugging goes off again and the host key is removed).
+Still to do, with you: the CDP part only. Close the test-profile window, run `CdpAttach profile`, turn remote debugging on, run `CdpAttach attach` and approve Chrome's prompt, then turn it off again.
 
 ## S7: network identity (in progress)
 
@@ -250,9 +291,20 @@ Checked without you, on the home Ethernet:
 - `GetIPv4Properties` throws for adapters without IPv4 (one is up on this laptop), so adapters are asked whether they support IPv4 first.
 - Windows 11 only gives desktop apps the Wi-Fi name with location access, so the fingerprint doesn't use it; it's shown when available.
 
-Notes for Phase 4: ALDREN subscribes to the Network List Manager's events instead of polling, and uses the WLAN API rather than netsh.
+Your session (2026-11-01, 9 minutes under `watch`):
+- **One fingerprint covers both adapters.** With only the Ethernet enrolled, the Wi-Fi was already Home: both reach the same router, so Windows gives them the same network ID and gateway. Enrolling on Wi-Fi added nothing.
+- **Ethernet:** 9 reconnects with the Wi-Fi up; Home throughout.
+- **Wi-Fi at home:** 3 reconnects, each Home 1.6–1.7 s after the link came up (target ≤ 2 s). Each time, though, the first ~1.5 s read **Away**: while Windows is still identifying a network that just connected, the probe sees one that doesn't match yet. The watch summary counted that as "known at 0 ms"; the correct state took 1.6–1.7 s.
+- **Phone hotspot** (13:31): Away 1.9 s after connecting, for the minute it stayed connected.
+- **Dropped links:** a snapshot then took 3–4 s instead of ~30 ms, because resolving the gateway's MAC waits for an ARP answer that never comes.
+- **Not in the log:** reboots, and whether Tailscale was toggled. A VPN produces no link events, and the state only ever changed with a physical link.
 
-Still to do, with you: enroll on Ethernet and on Wi-Fi; under `watch`, 10 reconnects on each, a phone hotspot (expect Away) and Tailscale on and off (expect no change); 2 reboots on each with a `snapshot` afterwards (expect Home).
+Notes for Phase 4:
+- Subscribe to the Network List Manager's events instead of polling, and use the WLAN API rather than netsh.
+- Announce Home as soon as a network matches, but Away only after ~3 s without a match, so identification never reads as leaving.
+- Read the gateway's MAC from the ARP cache (`GetIpNetEntry2`) or bound the wait.
+
+Still to do, with you: the 2 reboots on each adapter with a `snapshot` afterwards (expect Home), if they weren't done.
 
 ## S8: FreeLLMAPI gateway (in progress)
 

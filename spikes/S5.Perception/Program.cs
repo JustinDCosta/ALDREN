@@ -41,7 +41,8 @@ internal static class Program
         {
             "capture" => CaptureLoop(),
             "analyze" => Analyze(report),
-            "ground" => Ground(report, int.Parse(Option(args, "--n") ?? "5", CultureInfo.InvariantCulture)),
+            "ground" => Ground(report, int.Parse(Option(args, "--n") ?? "5", CultureInfo.InvariantCulture),
+                int.Parse(Option(args, "--max-marks") ?? "60", CultureInfo.InvariantCulture), int.Parse(Option(args, "--max-width") ?? "0", CultureInfo.InvariantCulture)),
             "selftest" => SelfTest(report),
             "testwindow" => TestWindow(),
             _ => Usage(),
@@ -138,17 +139,30 @@ internal static class Program
         }
 
         var rows = new List<(string Process, double UiaMs, int Named, double OcrMs, int Agree, int Asked)>();
+        var misses = new List<(string Process, string Kind)>();
+        var offsets = new List<(string Process, double Dx, double Dy, bool Inside)>();
         foreach (var (folder, record) in Captures())
         {
             using var bitmap = Decode(File.ReadAllBytes(Path.Combine(folder, "screen.png"))).GetAwaiter().GetResult();
             var (words, ocrMs) = OcrRunner.ReadAsync(bitmap).GetAwaiter().GetResult();
-            var verdicts = record.Texts.Select(e => OcrRunner.Agrees(e, words)).Where(v => v is not null).ToList();
+            var pixels = new byte[4 * bitmap.PixelWidth * bitmap.PixelHeight];
+            bitmap.CopyToBuffer(pixels.AsBuffer());
+            var checkedTexts = record.Texts.Select(e => (Element: e, Verdict: OcrRunner.Agrees(e, words))).Where(t => t.Verdict is not null)
+                .Select(t => (t.Element, t.Verdict, Miss: t.Verdict == true ? null
+                    : !OcrRunner.NothingInside(t.Element, words) ? "other text"
+                    : BlankBox(pixels, bitmap.PixelWidth, bitmap.PixelHeight, t.Element.Bounds) ? "not drawn" : "nothing read"))
+                .ToList();
+            // Labels UI Automation reports but nothing draws (clipped by a scroll area, covered by another element) aren't OCR's to read.
+            var drawn = checkedTexts.Where(t => t.Miss != "not drawn").ToList();
             rows.Add((record.Process, record.UiaMilliseconds, record.Elements.Count(e => e.Name.Length > 0), ocrMs,
-                verdicts.Count(v => v == true), verdicts.Count));
+                drawn.Count(t => t.Verdict == true), drawn.Count));
+            misses.AddRange(checkedTexts.Where(t => t.Miss is not null).Select(t => (record.Process, t.Miss!)));
+            offsets.AddRange(checkedTexts.Select(t => OcrRunner.FirstWordOffset(t.Element, words)).OfType<(double Dx, double Dy, bool Inside)>()
+                .Select(o => (record.Process, o.Dx, o.Dy, o.Inside)));
         }
 
         Line(report, $"## S5 analyze, {DateTime.Now:yyyy-MM-dd HH:mm} ({rows.Count} captures)");
-        Line(report, "| App | Captures | UI Automation p90 | Named interactive elements (median) | OCR p90 | OCR reads the UIA Text labels |");
+        Line(report, "| App | Captures | UI Automation p90 | Named interactive elements (median) | OCR p90 | OCR reads the drawn UIA text labels |");
         Line(report, "|---|---|---|---|---|---|");
         foreach (var app in rows.GroupBy(r => r.Process))
         {
@@ -159,10 +173,21 @@ internal static class Program
         Line(report, $"| All | {rows.Count} | {P90(rows.Select(r => r.UiaMs))} ms | {Median(rows.Select(r => (double)r.Named))} | " +
                      $"{P90(rows.Select(r => r.OcrMs))} ms | {Share(rows.Sum(r => r.Agree), rows.Sum(r => r.Asked))} |");
         Line(report, $"French OCR installed: {OcrRunner.FrenchAvailable}");
+        Line(report, "");
+        Line(report, "| App | Labels not drawn (blank box) | Misses: nothing read | Misses: other text read | Label first words found nearby | Their offset from the box (median dx, dy) | Of those, centre outside the box |");
+        Line(report, "|---|---|---|---|---|---|---|");
+        foreach (var app in misses.Select(m => m.Process).Concat(offsets.Select(o => o.Process)).Distinct())
+        {
+            var m = misses.Where(x => x.Process == app).ToList();
+            var o = offsets.Where(x => x.Process == app).ToList();
+            Line(report, $"| {app} | {m.Count(x => x.Kind == "not drawn")} | {m.Count(x => x.Kind == "nothing read")} | {m.Count(x => x.Kind == "other text")} | " +
+                         $"{o.Count} | {Median(o.Select(x => x.Dx))}, {Median(o.Select(x => x.Dy))} px | {o.Count(x => !x.Inside)} |");
+        }
+
         return 0;
     }
 
-    private static int Ground(StringBuilder report, int perCapture)
+    private static int Ground(StringBuilder report, int perCapture, int maxMarks, int maxWidth)
     {
         if (NoCaptures())
         {
@@ -170,13 +195,15 @@ internal static class Program
         }
 
         var captures = Captures().Select(c => (c.Folder, c.Record, Png: File.ReadAllBytes(Path.Combine(c.Folder, "screen.png")))).ToList();
-        Line(report, $"## S5 ground, {DateTime.Now:yyyy-MM-dd HH:mm} ({captures.Count} captures, up to {perCapture} questions each)");
-        return RunGrounding(report, captures, perCapture);
+        Line(report, $"## S5 ground, {DateTime.Now:yyyy-MM-dd HH:mm} ({captures.Count} captures, up to {perCapture} questions each, " +
+                     $"at most {maxMarks} boxes, {(maxWidth > 0 ? $"images scaled to {maxWidth} px wide at most" : "full-size images")})");
+        return RunGrounding(report, captures, perCapture, maxMarks, maxWidth);
     }
 
     // Each capture's numbered image is saved next to it as marks.png, so a wrong answer can be checked against what the model saw.
+    // maxWidth > 0 scales both images down first, so the vision encoder sees the number tags at the size they were drawn.
     private static int RunGrounding(StringBuilder report, List<(string Folder, CaptureRecord Record, byte[] Png)> captures, int perCapture,
-        bool showAnswers = false)
+        int maxMarks = 60, int maxWidth = 0, bool showAnswers = false)
     {
         var marks = new List<(UiElementInfo, Point?)>();
         var raw = new List<(UiElementInfo, Point?)>();
@@ -191,20 +218,22 @@ internal static class Program
                 // Enabled, named controls with unique names: the things a user would ask for by name.
                 var candidates = record.Elements.Where(e => e.Name.Trim().Length > 0 && e.IsEnabled && e.ControlType != "Document")
                     .GroupBy(e => e.Name.Trim(), StringComparer.OrdinalIgnoreCase).Where(g => g.Count() == 1).Select(g => g.First())
-                    .Take(60).Select((e, i) => e with { Id = i + 1 }).ToList();
+                    .Take(maxMarks).Select((e, i) => e with { Id = i + 1 }).ToList();
                 if (candidates.Count == 0)
                 {
                     continue;
                 }
 
-                var marked = MarksRenderer.Render(png, candidates);
+                var scale = maxWidth > 0 && record.Width > maxWidth ? maxWidth / (double)record.Width : 1.0;
+                var marked = MarksRenderer.Render(png, candidates, scale);
+                var plain = scale < 1 ? MarksRenderer.Render(png, [], scale) : png;
                 File.WriteAllBytes(Path.Combine(folder, "marks.png"), marked);
                 foreach (var target in candidates.OrderBy(_ => rng.Next()).Take(perCapture))
                 {
                     var (markAnswer, markMs) = probe.AskAsync(marked, GroundingProbe.MarkQuestion(target), 8, cts.Token).GetAwaiter().GetResult();
                     var chosen = GroundingProbe.ParseMark(markAnswer) is { } id ? candidates.FirstOrDefault(c => c.Id == id) : null;
                     marks.Add((target, chosen?.Bounds.Center));
-                    var (pointAnswer, pointMs) = probe.AskAsync(png, GroundingProbe.PointQuestion(target), 40, cts.Token).GetAwaiter().GetResult();
+                    var (pointAnswer, pointMs) = probe.AskAsync(plain, GroundingProbe.PointQuestion(target), 40, cts.Token).GetAwaiter().GetResult();
                     var point = GroundingProbe.ParsePoint(pointAnswer, record.Width, record.Height);
                     raw.Add((target, point));
                     latencies.AddRange([markMs, pointMs]);
@@ -309,6 +338,30 @@ internal static class Program
         double left = inside.Min(w => w.Bounds.Left), right = inside.Max(w => w.Bounds.Right);
         double top = inside.Min(w => w.Bounds.Top), bottom = inside.Max(w => w.Bounds.Bottom);
         return ((left + right) / 2 - element.Bounds.Center.X, (top + bottom) / 2 - element.Bounds.Center.Y);
+    }
+
+    // Nothing is drawn in the box when under 1% of its pixels are more than 50 (of 255) away from its median brightness; glyphs
+    // give a few percent or more.
+    private static bool BlankBox(byte[] pixels, int width, int height, Grounding.Rect r)
+    {
+        int x0 = Math.Max(0, (int)r.Left), y0 = Math.Max(0, (int)r.Top), x1 = Math.Min(width, (int)r.Right), y1 = Math.Min(height, (int)r.Bottom);
+        var lum = new List<double>();
+        for (var y = y0; y < y1; y++)
+        {
+            for (var x = x0; x < x1; x++)
+            {
+                var i = 4 * (y * width + x);
+                lum.Add(0.114 * pixels[i] + 0.587 * pixels[i + 1] + 0.299 * pixels[i + 2]);
+            }
+        }
+
+        if (lum.Count == 0)
+        {
+            return true;
+        }
+
+        var median = lum.Order().ElementAt(lum.Count / 2);
+        return lum.Count(l => Math.Abs(l - median) > 50) < 0.01 * lum.Count;
     }
 
     private static async Task<SoftwareBitmap> Decode(byte[] png)

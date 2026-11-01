@@ -6,10 +6,13 @@ using System.Windows.Media.Imaging;
 
 namespace S5.Perception.Grounding;
 
-/// <summary>Draws a numbered red box over each element (the number is its id). WPF rendering: call on an STA thread.</summary>
+/// <summary>
+/// Draws a numbered red box over each element (the number is its id), optionally on a copy scaled by <paramref name="scale"/>; with no
+/// elements it just scales. WPF rendering: call on an STA thread.
+/// </summary>
 internal static class MarksRenderer
 {
-    public static byte[] Render(byte[] png, IReadOnlyList<UiElementInfo> elements)
+    public static byte[] Render(byte[] png, IReadOnlyList<UiElementInfo> elements, double scale = 1.0)
     {
         var image = new BitmapImage();
         image.BeginInit();
@@ -17,7 +20,7 @@ internal static class MarksRenderer
         image.CacheOption = BitmapCacheOption.OnLoad;
         image.EndInit();
         image.Freeze();
-        int width = image.PixelWidth, height = image.PixelHeight;
+        int width = (int)Math.Round(image.PixelWidth * scale), height = (int)Math.Round(image.PixelHeight * scale);
         var pen = new Pen(Brushes.Red, 2);
         pen.Freeze();
         var typeface = new Typeface("Segoe UI Semibold");
@@ -29,7 +32,7 @@ internal static class MarksRenderer
             dc.DrawImage(image, new System.Windows.Rect(0, 0, width, height));
             foreach (var e in elements)
             {
-                var box = new System.Windows.Rect(e.Bounds.Left, e.Bounds.Top, e.Bounds.Width, e.Bounds.Height);
+                var box = new System.Windows.Rect(e.Bounds.Left * scale, e.Bounds.Top * scale, e.Bounds.Width * scale, e.Bounds.Height * scale);
                 dc.DrawRectangle(null, pen, box);
                 var label = new FormattedText(e.Id.ToString(CultureInfo.InvariantCulture), CultureInfo.InvariantCulture,
                     FlowDirection.LeftToRight, typeface, size, Brushes.White, 1.0);

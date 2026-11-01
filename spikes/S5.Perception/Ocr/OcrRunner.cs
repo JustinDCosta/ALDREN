@@ -42,5 +42,31 @@ internal static class OcrRunner
         return read.Length == 0 ? false : read.Contains(name, StringComparison.Ordinal) || name.Contains(read, StringComparison.Ordinal);
     }
 
+    /// <summary>True when OCR read no word at all inside the element (as opposed to reading something else there).</summary>
+    public static bool NothingInside(UiElementInfo element, IReadOnlyList<OcrWord> words) =>
+        !words.Any(w => GroundingScore.PointInElement(w.Bounds.Center, element));
+
+    /// <summary>
+    /// Where OCR read the first word of an element's name (4+ characters) within <paramref name="reach"/> px of its box: the word's
+    /// left edge relative to the box's, its vertical centre relative to the box's, and whether its centre is inside the box. A steady
+    /// offset across many labels means the screenshot and UI Automation coordinates disagree.
+    /// </summary>
+    public static (double Dx, double Dy, bool Inside)? FirstWordOffset(UiElementInfo element, IReadOnlyList<OcrWord> words, double reach = 40)
+    {
+        var first = element.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(Normalise).FirstOrDefault(t => t.Length >= 4);
+        if (first is null)
+        {
+            return null;
+        }
+
+        var b = element.Bounds;
+        var match = words
+            .Where(w => Normalise(w.Text) == first && w.Bounds.Center.X >= b.Left - reach && w.Bounds.Center.X <= b.Right + reach
+                        && w.Bounds.Center.Y >= b.Top - reach && w.Bounds.Center.Y <= b.Bottom + reach)
+            .OrderBy(w => Math.Abs(w.Bounds.Left - b.Left) + Math.Abs(w.Bounds.Center.Y - b.Center.Y))
+            .FirstOrDefault();
+        return match is null ? null : (match.Bounds.Left - b.Left, match.Bounds.Center.Y - b.Center.Y, GroundingScore.PointInElement(match.Bounds.Center, element));
+    }
+
     private static string Normalise(string text) => new([.. text.ToLowerInvariant().Where(char.IsLetterOrDigit)]);
 }
