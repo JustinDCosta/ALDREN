@@ -12,6 +12,7 @@ Direct packages of the Phase 1 solution (`src/` and its tests). Versions for `sr
 | Serilog.Formatting.Compact | 3.0.0 | Apache-2.0 | Common | Compact JSON log format |
 | StreamJsonRpc | 2.26.150 | MIT | Contracts | IPC between Core and the App (ADR-0003) |
 | Microsoft.Data.Sqlite | 10.0.14 | MIT | Security | Audit log in `aldren.db` |
+| Microsoft.Extensions.Logging.Abstractions | 10.0.14 | MIT | Security | Logging from the Tool Gateway |
 | Microsoft.Windows.CsWin32 | 0.3.367 | MIT | Security, Core, App (build only) | Generated Win32 declarations |
 | Microsoft.WindowsAppSDK | 2.6.4 | MIT | App | WinUI 3 (self-contained) |
 | Microsoft.Windows.SDK.BuildTools | 10.0.28000.2957 | MIT | App | Windows SDK build tools |

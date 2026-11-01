@@ -28,6 +28,8 @@ Every capability is a typed tool with a JSON schema, a risk tier, a required per
 
 Execution order: schema validation → permission check → policy check (risk tier, untrusted-content taint, current mode) → confirmation if required → execution with timeout → post-condition verification → audit log → sanitised result returned to the model.
 
+The gateway fails closed: if it can't write the audit log, nothing above tier 0 runs, and the failure goes to the log file. A confirmation nobody answers within 60 s, or that can't be shown because no App is connected, counts as declined.
+
 ## Risk tiers
 
 | Tier | Examples | Policy |
@@ -41,7 +43,7 @@ Execution order: schema validation → permission check → policy check (risk t
 Deletes go to the Recycle Bin unless you explicitly ask for permanent deletion (tier 3, confirmed).
 
 ## Permissions
-You grant permissions in Settings, per capability (for example files: read-only vs modify; browser: read vs interact; per-site levels). They are stored where no tool can write. A model can never grant, widen or bypass a permission.
+You grant permissions in Settings, per capability (for example files: read-only vs modify; browser: read vs interact; per-site levels). They are stored where no tool can write. ALDREN's own folders (settings, database, logs) are off-limits to every tool. A model can never grant, widen or bypass a permission.
 
 ## Untrusted content
 - Content from web pages, downloaded files, documents, the screen, emails and the clipboard is tagged with its source.
