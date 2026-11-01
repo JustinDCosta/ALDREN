@@ -26,7 +26,7 @@ Labels: **Planned** · **In progress** · **Implemented** (code written, not yet
 | S5 screen perception probe | 0 | In progress | Selftest on a synthetic window passes end to end: UI Automation 144 ms, OCR reads 9/9 labels, numbered boxes 8/9 at ~0.5 s per question. The measurement needs your captures |
 | S6 browser bridge probe | 0 | In progress | Host, page script and Playwright channel checked without you (host relay 0.10 ms p90, injected instructions inert, installed Chrome driven on a separate profile). Through Chrome itself it needs your session |
 | S7 network identity probe | 0 | In progress | On the home Ethernet: physical network fingerprinted, Tailscale recognised as virtual and ignored, Home/Away correct. The reconnect, hotspot and reboot checks need you |
-| Spike S8 | 0 | Planned | |
+| S8 FreeLLMAPI gateway evaluation | 0 | In progress | v0.16.14 built outside the repo and launched hardened: 127.0.0.1 only, foreign Host refused, encryption key DPAPI-protected. The go/no-go checks (failover, tool calls, images, canary...) need your provider keys and dashboard setup |
 | Core and App processes, IPC, tray, startup, configuration, logging | 1 | Planned | |
 | Tool Gateway, permissions, audit log | 1 | Planned | |
 | Local inference and residency manager | 2 | Planned | Models chosen in S1; the llama-server client must retry dropped keep-alive connections |
@@ -60,4 +60,4 @@ Labels: **Planned** · **In progress** · **Implemented** (code written, not yet
 - S5: about 30 window captures (Chrome, VS Code, Explorer, Discord, Steam and an error dialog) with `S5.Perception.exe capture`; the captures stay in `E:\AldrenData\bench\s5`.
 - S6: `spikes\S6.BrowserBridge\run-s6.ps1`, about 10 minutes: load the test extension in a separate Chrome profile and approve one remote-debugging prompt; it removes what it adds.
 - S7: with `spikes\S7.Network\bin\Release\net10.0-windows\win-x64\S7.Network.exe`: `enroll` on Ethernet and again on Wi-Fi, then `watch` while you reconnect each 10 times, join a phone hotspot and toggle Tailscale; after 2 reboots on each, `snapshot`.
-- Later in Phase 0: provider keys for S8, listed in the plan.
+- S8, about 30 minutes: start the gateway (`spikes\S8.Gateway\start-gateway.ps1`), set it up in its dashboard (account, 3–4 provider keys typed there only, the two `aldren-*` chains), then run `dotnet run --project tools\bench -c Release -- gateway --url <its address>` and follow its prompts; `stop-gateway.ps1` at the end.

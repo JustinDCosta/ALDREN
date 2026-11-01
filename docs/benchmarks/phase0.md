@@ -28,6 +28,7 @@ Full URLs (commit-pinned for Hugging Face) are in [tools/setup/phase0-downloads.
 | Keyword-spotting baseline (zipformer gigaspeech 3.3M) | sherpa-onnx kws-models release | `f170013b4716e41b62b9bfd809687c207cef798ef9bc6534d524e17af9b6561a` (no published digest for this 2024 asset; computed at download, size matched the release) |
 | sherpa-onnx (NuGet `org.k2fsa.sherpa.onnx`) and NAudio | 2.0.1 and 3.3.0 | pinned in `spikes/S3.Voice/S3.Voice.csproj` |
 | FlaUI.UIA3 (NuGet) | 5.0.0 | pinned in `spikes/S5.Perception/S5.Perception.csproj` |
+| FreeLLMAPI (shallow clone in `E:\AldrenData\gateway\freellmapi-0.16.14`, never in this repo) | tag v0.16.14 = commit `5127fee51ba97ad112915ebe227ba13df461a266` | git object hashes; its 964 npm packages come from registry.npmjs.org with the integrity hashes in its `package-lock.json` (`npm ci`) |
 | Microsoft.Playwright (NuGet; drives the installed Chrome, no browsers downloaded) | 1.64.1 | SHA-512 `JwfBle/dD07BvmskthmRsGH9FomOJ+enbxk8iy5kKEaA9mrfix33IQ2hH4oBpcL5gLjt+d0u8RrH1gufyDbZFg==` (base64, as NuGet records it) |
 | Supertonic 3 TTS int8 | sherpa-onnx tts-models release | `82fa96f91c4ef8abaae3a14a3f4153facf88bed821d1f7331cec2700f432c427` |
 | Pocket TTS (non-commercial licence) | sherpa-onnx tts-models release | `61422a478ef09d9b2c067261fb822e11786e0c86842c76d8633b7069968be7b5` |
@@ -252,3 +253,30 @@ Checked without you, on the home Ethernet:
 Notes for Phase 4: ALDREN subscribes to the Network List Manager's events instead of polling, and uses the WLAN API rather than netsh.
 
 Still to do, with you: enroll on Ethernet and on Wi-Fi; under `watch`, 10 reconnects on each, a phone hotspot (expect Away) and Tailscale on and off (expect no change); 2 reboots on each with a `snapshot` afterwards (expect Home).
+
+## S8: FreeLLMAPI gateway (in progress)
+
+FreeLLMAPI v0.16.14 lives in `E:\AldrenData\gateway\freellmapi-0.16.14`, outside this repo (it ships its own Claude Code hooks, which never get loaded here). `npm ci` installed its 964 locked packages from registry.npmjs.org; only four run install scripts (better-sqlite3's prebuilt binary, esbuild, msw, and fsevents, which is skipped on Windows). `spikes/S8.Gateway/start-gateway.ps1` launches it in the background and `stop-gateway.ps1` stops it. `aldren-bench gateway` runs the plan's checks (a)–(l) and appends to `E:\AldrenData\bench\s8\results.md`.
+
+How it's launched:
+- **Encryption key:** 32 random bytes, generated once and kept DPAPI-protected for your Windows account in `E:\AldrenData\gateway\key.dpapi`. It is decrypted only to start the gateway and is never written to a file or a user variable. The gateway uses it from its environment, so no `.encryption-key` file appears next to the database.
+- **Settings:** the plan's list plus three more. `HOST=127.0.0.1` matters most: without it the gateway listens on every interface (its default is `::`). `NODE_ENV=production` matches the project's Docker image, and `FREEAPI_DB_DIR_HARDENING=1` locks the database folder (`%LOCALAPPDATA%\Aldren\gateway`) to your account.
+- **Detached launch:** started through ShellExecute. A plain `Process.Start` handed the gateway the caller's console handles, so a detached gateway kept a terminal's output open.
+
+Checked without you:
+
+| Check | Result | Target |
+|---|---|---|
+| (a) Listening sockets | 127.0.0.1 only | loopback only |
+| (b) Request with `Host: evil.example` | 403 (`localhost`: 200) | 403 |
+| (c) Memory, no providers configured | 84 MB at start, 85 MB after 10 idle minutes (flat) | ≤ 100 MB after 10 idle minutes |
+| (k) Outbound, no providers configured | none during 10 idle minutes (the catalog sync to `api.freellmapi.co` had run at startup) | catalog host and configured providers only |
+
+From the source, ahead of your run:
+- **`auto:<chain>` only routes over that chain's own models**: the router joins on the chain's rows and never falls back to the rest of the catalog. Check (e) confirms it live.
+- **Image refusals:** the 422 "no vision model" refusal looks at the active profile, not the requested chain, so an image sent to `auto:aldren-fast` may be refused with another code. Check (h) records the code and fails only if a model answers.
+- **Gemini search:** a `google_search` tool is passed to Gemini as Search grounding, but the gateway doesn't read Gemini's grounding metadata, so source links probably won't come back. Check (i) will show; if so, Phase 6's grounded answers call Gemini directly.
+- **What it stores:** the response cache is off by default (when on, it can write answers to the database in plain text). The unified key is never printed. The first-run setup code is logged, but only matters for other devices, which can't reach a loopback-only gateway.
+- **Background traffic:** the catalog host `api.freellmapi.co` every 12 h; with keys added, a key health check about every 5 minutes.
+
+Still to do, with you: the dashboard setup (account, 3–4 provider keys, keyless/community/relay providers off, the `aldren-fast` and `aldren-vision` chains starting empty with auto-include off, MCP and Ollama emulation off), then `aldren-bench gateway` for (c)–(l) with providers configured, then the go/no-go per ADR-0007.
