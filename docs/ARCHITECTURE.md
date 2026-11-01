@@ -126,7 +126,7 @@ Decision record: [ADR-0003](decisions/0003-process-model.md).
 | Wake-word trainer, benchmarks | Offline tools (Python, isolated environment) | You, from Settings | Never part of the runtime |
 
 - **IPC:** StreamJsonRpc over a named pipe restricted to your account; typed contracts in `Aldren.Contracts`; streaming events for tokens and state. ALDREN itself opens no TCP port.
-- **Supervision:** child processes run in a Job Object (kill on close) so nothing outlives Core; crashes restart with exponential backoff.
+- **Supervision:** llama-server and the gateway run in a Job Object (kill on close) so they never outlive Core; crashes restart with exponential backoff. The App runs **outside** that job: a job that kills its processes when Core dies would take the App with it, and the App could never relaunch Core.
 - **Shutdown:** graceful on logoff and restart; reminders and focus leases are persisted.
 - **Not a Windows Service:** services run in session 0, without the interactive desktop and audio context ALDREN needs.
 - **Packaging:** development builds first; a per-user installer with updates (Velopack) and optional code signing in Phase 9.
@@ -476,6 +476,7 @@ src/
   Aldren.Core/                 background runtime host, orchestrator, supervisor
   Aldren.App/                  WinUI 3 UI (island, expanded window, settings, tray)
   Aldren.Contracts/            shared DTOs, IPC contracts, tool schemas
+  Aldren.Common/               code both processes share (paths, logging, restart backoff, hotkeys, island placement), unit-tested without WinUI
   Aldren.Brains/               Quick / Action / Research brain logic
   Aldren.Inference/            llama-server management, residency manager
   Aldren.Cloud/                Cloud Policy Layer, gateway supervisor, direct adapters

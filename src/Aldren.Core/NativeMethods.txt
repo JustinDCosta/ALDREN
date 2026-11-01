@@ -1,0 +1,10 @@
+CreateProcess
+CreateJobObject
+SetInformationJobObject
+AssignProcessToJobObject
+OpenProcess
+JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+GetNamedPipeClientProcessId
+MessageBox
+CloseHandle
+WIN32_ERROR
