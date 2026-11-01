@@ -361,7 +361,40 @@ You created the dashboard account and added 34 provider keys. Some are first-par
 
 **Development finding: two gateway databases.** Commands I run here go through the Claude desktop app, and Windows redirects their writes under `%LOCALAPPDATA%` into the app's own folder (`...\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local\`). The gateways I started this morning and the ones you started this afternoon therefore kept separate databases at the same path. ALDREN itself isn't affected at runtime. During development, anything that must be shared with your processes goes in `E:\AldrenData` or runs in a terminal tab.
 
-Still to do, with you:
-- Create the `aldren-fast` and `aldren-vision` chains (starting empty, auto-include off).
-- Ideally, disable the reseller keys: ALDREN won't use them, and every one adds background traffic and memory.
-- Rerun `aldren-bench gateway` for (d)–(l), then the go/no-go per ADR-0007.
+### Configured runs (2026-11-01, 18:10 and 19:28)
+
+Setup, done together in the dashboard:
+- `aldren-fast`: Groq's GPT-OSS 120B, GPT-OSS 20B and Qwen3.8 27B.
+- `aldren-vision`: Google's Gemini 2.5 Flash, Gemini Flash and Gemini Flash Lite. Llama 4 Scout was only offered through Cloudflare and a reseller.
+- Keys: 31 of the 34 switched off, leaving Google, Groq and OpenRouter.
+
+The dashboard's model table only saves after **Save changes**. The first attempt left `aldren-fast` empty, so the 18:10 run's fast-chain checks failed; the contents were then verified in the database itself. The 19:28 rerun spaced requests 7 s apart (`--pace-ms`), because Gemini's free tier allows about 10 requests a minute and the 18:10 burst drew 429s.
+
+| Check | Result | Target |
+|---|---|---|
+| (c) Memory after 10 idle minutes (18:10) | 103 MB working set, 101 MB private | ≤ 100 MB |
+| (d) Overhead, (e) failover | not measured (skipped) | ≤ 20 ms; in-chain 10/10 |
+| (f) Tool calls | `aldren-fast` 20/20 (Groq); `aldren-vision` 18/20, with every answered call valid (the two losses were a 502 and a 429) | ≥ 95% |
+| (g) `json_schema` output | 20/20 | ≥ 95% |
+| (h) Image routing | `aldren-vision` answered "red" 4/5 (one 502); an image sent to `aldren-fast` was answered inside the chain by Qwen3.8 27B, which is vision-capable | vision models only, never outside the chain |
+| (i) `google_search` on `gemini-2.5-flash` | answered by Google itself, no source links | |
+| (k) Outbound | Groq, Google and OpenRouter (`104.18.2.115` is openrouter.ai); nothing else, nothing while idle | configured providers only |
+| (l) Canary | echoed by the model; absent from the database and the log | absent |
+| `X-Routed-Via` | inside the requested chain on 63/63 answers | every answer |
+
+Also seen:
+- **Hung requests aren't cut short.** One Gemini request hung for the full 60 s provider timeout, then returned 502 without failing over, because the 8 s failover budget was already spent. ALDREN needs its own short client-side deadlines (as ADR-0007 plans) and a shorter `PROVIDER_TIMEOUT_GOOGLE`.
+- **Chains drift.** A chain can look right in the dashboard yet be empty in the database. ADR-0007's read-only drift check at every start should check chain contents and enabled keys.
+
+### Go/no-go (ADR-0007)
+
+ADR-0007's revisit triggers are unacceptable overhead, unreliable tool calling, a security problem, or an unmaintained project.
+- **Tool calling is reliable:** 38 of 38 answered tool calls valid, 20 of 20 schema outputs.
+- **Security holds:** loopback only, foreign Host refused, the canary was never stored, 63 of 63 answers from inside the requested chain, and only configured providers contacted. The one real risk is configuration, not a hole in the gateway: a model name can resolve to a reseller.
+- **Still open:** overhead (d) and failover (e) weren't measured, and memory is 1–3 MB over target.
+
+Recommendation, for your decision: **go**, on four conditions:
+1. ALDREN uses its curated chains only, never bare model names.
+2. The gateway holds keys only for providers ALDREN uses, and the start-up drift check verifies chain contents and enabled keys.
+3. Client-side deadlines, with a provider timeout of about 15 s.
+4. The overhead and failover measurements are completed before Phase 6.

@@ -100,6 +100,8 @@ public static partial class GatewayCommand
             checks.Add('j');
         }
 
+        pace = TimeSpan.FromMilliseconds(int.Parse(Args.Value(args, "--pace-ms") ?? "0", System.Globalization.CultureInfo.InvariantCulture));
+        pacedGateway = baseUri;
         var fast = Platforms(Args.Value(args, "--fast-platforms") ?? "groq,cerebras");
         var vision = Platforms(Args.Value(args, "--vision-platforms") ?? "google,groq");
         var pid = TcpTable.All().FirstOrDefault(r => r.State == "LISTEN" && r.Local.Port == baseUri.Port).ProcessId;
@@ -371,9 +373,14 @@ public static partial class GatewayCommand
         }
 
         var text = await ChatAsync(api, Body("auto:aldren-fast", Picture()), ct);
-        var leaked = text.Status == 200 || (text.Via is { } v && !RoutingHeaders.IsAllowed(v, fast));
+        // A text chain may hold a vision-capable model; what must never happen is an answer from outside the chain.
+        var outcome = text.Status == 200
+            ? text.Via is { } v && RoutingHeaders.IsAllowed(v, fast)
+                ? $"served inside the chain by {text.RoutedViaHeader}, so the chain has a vision-capable model"
+                : $"FAIL: served outside the chain ({text.RoutedViaHeader ?? "no X-Routed-Via"})"
+            : text.Status == 422 ? "refused with 422 (pass)" : "refused, but not with 422";
         Line(report, $"- (h) image to auto:aldren-vision: {correct}/5 answered \"red\" by a model in the chain ({string.Join(", ", vias)}); image to " +
-                     $"auto:aldren-fast: {text.Status} \"{Shorten(text.Error)}\" ({(leaked ? "FAIL: it was served" : text.Status == 422 ? "pass" : "refused, but not with 422")})");
+                     $"auto:aldren-fast: {text.Status} \"{Shorten(text.Error)}\" ({outcome})");
     }
 
     private static async Task CheckGoogleSearchAsync(StringBuilder report, HttpClient api, string gemini, CancellationToken ct)
@@ -454,8 +461,18 @@ public static partial class GatewayCommand
                      "(sampled every second, so connections shorter than that can be missed; CDN addresses change, so an unmatched address needs a second look)");
     }
 
+    // --pace-ms spaces out requests to the gateway (never the direct llama-server ones), so free-tier rate limits such as
+    // Gemini's ~10 per minute don't hide what the checks measure.
+    private static TimeSpan pace = TimeSpan.Zero;
+    private static Uri? pacedGateway;
+
     private static async Task<Reply> ChatAsync(HttpClient http, JsonObject body, CancellationToken ct)
     {
+        if (pace > TimeSpan.Zero && http.BaseAddress == pacedGateway)
+        {
+            await Task.Delay(pace, ct);
+        }
+
         var clock = Stopwatch.StartNew();
         using var content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
         using var response = await http.PostAsync("v1/chat/completions", content, ct);
