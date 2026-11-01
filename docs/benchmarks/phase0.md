@@ -343,4 +343,25 @@ From the source, ahead of your run:
 - **What it stores:** the response cache is off by default (when on, it can write answers to the database in plain text). The unified key is never printed. The first-run setup code is logged, but only matters for other devices, which can't reach a loopback-only gateway.
 - **Background traffic:** the catalog host `api.freellmapi.co` every 12 h; with keys added, a key health check about every 5 minutes.
 
-Still to do, with you: the dashboard setup (account, 3–4 provider keys, keyless/community/relay providers off, the `aldren-fast` and `aldren-vision` chains starting empty with auto-include off, MCP and Ollama emulation off), then `aldren-bench gateway` for (c)–(l) with providers configured, then the go/no-go per ADR-0007.
+### Your first run (2026-11-01)
+
+You created the dashboard account and added 34 provider keys. Some are first-party (Google, Groq, OpenRouter, NVIDIA, Cohere, Hugging Face, Zhipu), but most are resellers and relays (electronhub, dreamprompting, airforce, blaze, experiential, speechify, apinex, inferbase, unorouter, xkiro and others). No chains were created yet. MCP and Ollama emulation are off, the defaults.
+
+| Check | Result | Target |
+|---|---|---|
+| (a) Listening sockets | 127.0.0.1 only | loopback only |
+| (b) `Host: evil.example` | 403 | 403 |
+| (c) Memory after 10 idle minutes, 34 providers configured | 103 MB working set, 107 MB private | ≤ 100 MB |
+| (d) Overhead, (e) failover | skipped | |
+| (f) tool calls, (g) schema output, (h) image routing, (l) canary | not measured: without the `aldren-*` chains every request got "Profile not found" (400) | |
+| (i) `google_search` on `gemini-2.5-flash` | answered, no source links | |
+| (k) Outbound | ~30 hosts while idle: the health check reaches every configured provider about every 5 minutes; only Groq and Google could be matched, since the check expected 3–4 providers | catalog host and configured providers only |
+
+**Finding: a model name doesn't pin a provider.** The `gemini-2.5-flash` request went first to dreamprompting (it failed the gateway's model-identity check), then to electronhub, which answered. Both are resellers selling a model under that name, so Google never saw the request, while two third parties did. The architecture lets ALDREN use pinned models as well as its chains. That's unsafe while resellers share model names, so the proposal for Task 12 is chains only, plus a gateway that holds only providers ALDREN may use.
+
+**Development finding: two gateway databases.** Commands I run here go through the Claude desktop app, and Windows redirects their writes under `%LOCALAPPDATA%` into the app's own folder (`...\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local\`). The gateways I started this morning and the ones you started this afternoon therefore kept separate databases at the same path. ALDREN itself isn't affected at runtime. During development, anything that must be shared with your processes goes in `E:\AldrenData` or runs in a terminal tab.
+
+Still to do, with you:
+- Create the `aldren-fast` and `aldren-vision` chains (starting empty, auto-include off).
+- Ideally, disable the reseller keys: ALDREN won't use them, and every one adds background traffic and memory.
+- Rerun `aldren-bench gateway` for (d)–(l), then the go/no-go per ADR-0007.

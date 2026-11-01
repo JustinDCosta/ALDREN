@@ -41,7 +41,8 @@ These are deliberate, honest limits of the design on this hardware. Update this 
 - FreeLLMAPI's "7.4 billion tokens/month" is its catalog's total across 34 providers. Your capacity with a handful of providers is a small fraction of that. The best models have the smallest daily caps, so quality drops later in the day and resets at midnight UTC (01:00 in Paris in winter, 02:00 in summer).
 - Gateway failover adds latency, and streaming can still fail after the first token.
 - Running the gateway locally does not make prompts private: they still go to the upstream providers under their terms.
-- The gateway appears to drop the source links from Gemini's Google Search grounding (to confirm in Phase 0). Grounded answers with sources therefore need a direct Gemini adapter and, for Gemini 3+, the paid tier.
+- The gateway drops the source links from Gemini's Google Search grounding: its Gemini adapter never reads the grounding metadata, and the Phase 0 request came back without links. Grounded answers with sources therefore need a direct Gemini adapter and, for Gemini 3+, the paid tier.
+- A model name doesn't pin a provider. Any configured platform that sells a model under that name can serve it: in Phase 0 a request for `gemini-2.5-flash` went to two resellers (dreamprompting, then electronhub) instead of Google. ALDREN therefore only uses its curated chains, and the gateway holds keys only for providers ALDREN may use.
 - Terms of service: Gemini's March 2026 terms describe the API as for professional or business purposes; Cohere forbids personal use (excluded); NVIDIA NIM is evaluation-only.
 
 ## Integrations
