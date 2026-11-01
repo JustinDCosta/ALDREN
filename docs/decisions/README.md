@@ -14,6 +14,6 @@ Each record explains one major decision: its context, the decision itself, the a
 | [0008](0008-research-pipeline.md) | ALDREN-owned research pipeline with verified citations | Accepted |
 | [0009](0009-browser-automation.md) | Chrome extension first, Playwright on demand, UI Automation fallback | Accepted; confirm in Phase 0 (S6) |
 | [0010](0010-home-away-detection.md) | Home detection by network identity, not Wi-Fi name | Accepted; confirm in Phase 0 (S7) |
-| [0011](0011-supertonic-voice-english-only.md) | Supertonic 3 voice on the CPU; English-only speech | Proposed (2026-11-01) |
+| [0011](0011-supertonic-voice-english-only.md) | Supertonic 3 voice on the CPU; English-only speech | Accepted (2026-11-01); a more natural voice to evaluate in Phase 3 |
 
 Template for new records: **Status** (with date) · **Context** · **Decision** · **Alternatives considered** · **Consequences** · **Revisit if**.

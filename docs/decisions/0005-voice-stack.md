@@ -1,6 +1,6 @@
 # ADR-0005: Custom wake word; sherpa-onnx with Parakeet and Kokoro
 
-- **Status:** Accepted (2026-10-31); to confirm in Phase 0 spikes S3 and S4. The text-to-speech and spoken-language parts are superseded by [ADR-0011](0011-supertonic-voice-english-only.md) (proposed 2026-11-01).
+- **Status:** Accepted (2026-10-31); to confirm in Phase 0 spikes S3 and S4. The text-to-speech and spoken-language parts are superseded by [ADR-0011](0011-supertonic-voice-english-only.md) (accepted 2026-11-01).
 
 ## Context
 ALDREN listens continuously for "ALDREN" (*al-drin*), offline, with low CPU use and few false activations. It then transcribes and speaks with low latency, without taking GPU memory from the language model.

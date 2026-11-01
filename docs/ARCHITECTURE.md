@@ -39,7 +39,7 @@ Success means:
 - **Local-first:** voice, chat, PC control, reminders and memory work offline.
 - **Discretion:** it stays out of the way while you game or stream.
 
-Current assumptions: one user, personal use, English-only speech ([ADR-0011](decisions/0011-supertonic-voice-english-only.md), proposed).
+Current assumptions: one user, personal use, English-only speech ([ADR-0011](decisions/0011-supertonic-voice-english-only.md)).
 
 ## 2. Target environment and budgets
 
@@ -295,7 +295,7 @@ Targets: ≤0.5 false wakes per hour and ≥95% detection at desk distance, meas
 
 **Speech-to-text:** Parakeet-TDT-0.6B-v3 (int8) via sherpa-onnx, on the CPU by default (~0.2–0.5 s per utterance *(est.)*), GPU optional. Larger models (Qwen3-ASR-1.7B, Granite Speech 4.1) are candidates for dictation later.
 
-**Text-to-speech:** Supertonic 3 (int8) via sherpa-onnx on the CPU: ~0.2 s to first audio for a short sentence (measured in S3). Replies are split into sentences and spoken one at a time, first sentence first, in one of Supertonic's ten preset voices chosen by you ([ADR-0011](decisions/0011-supertonic-voice-english-only.md), proposed; Kokoro took ~0.7–2.9 s on the CPU). No real person's voice is cloned without rights.
+**Text-to-speech:** Supertonic 3 (int8) via sherpa-onnx on the CPU: ~0.2 s to first audio for a short sentence (measured in S3). Replies are split into sentences and spoken one at a time, first sentence first, in Supertonic's preset voice 5 ([ADR-0011](decisions/0011-supertonic-voice-english-only.md); Kokoro took ~0.7–2.9 s on the CPU). You want a more natural voice than any preset, so Phase 3 evaluates more natural engines, GPU ones included. No real person's voice is cloned without rights.
 
 **End of speech:** 400 ms of silence ends a turn; recognition starts speculatively at 250 ms and is discarded if you keep talking, and 300 ms of audio from before the VAD fires is kept so first sounds aren't clipped.
 

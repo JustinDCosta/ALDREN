@@ -51,4 +51,5 @@ Labels: **Planned** · **In progress** · **Implemented** (code written, not yet
 | Installer, updates, soak testing | 9 | Planned | |
 
 ## Waiting on you
-- During Phase 0: the manual steps listed in the plan (recordings, screen captures, Chrome toggles, provider keys, network switching).
+- S3: a short live test on each microphone, unplugging the PD300X mid-capture once, and the Bluetooth headset check.
+- Later in Phase 0: the screen captures, Chrome toggles, provider keys, network switching and the 10-hour wake-word field test listed in the plan.

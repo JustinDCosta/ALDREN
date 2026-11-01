@@ -41,7 +41,7 @@ Deliverables: llama-server management (pinned build, health checks, API key, loo
 Exit: routing ≥90% on the eval set (target); first token <500 ms with the model warm; VRAM freed <5 s after a game goes fullscreen.
 
 ## Phase 3: Voice → MVP (M1)
-Deliverables: audio service (device policy, resampling, ducking); wake-word runtime and training wizard; VAD and streaming captions; sentence-streamed TTS; the follow-up window; interruption v1 (wake word, "stop", hotkey; half-duplex on speakers); live island states; no speech during calls or fullscreen use.
+Deliverables: audio service (device policy, resampling, ducking); wake-word runtime and training wizard; VAD and streaming captions; sentence-streamed TTS; the follow-up window; interruption v1 (wake word, "stop", hotkey; half-duplex on speakers); live island states; no speech during calls or fullscreen use. Also an evaluation of more natural-sounding voices than Supertonic's presets, GPU engines included, keeping first audio near 0.3 s (you asked for this on 2026-11-01).
 
 Exit: "ALDREN… open VS Code" works end to end; median ≤1.5 s to the first spoken word with the model warm; wake-word metrics reported against the targets (≤0.5 false wakes per hour, ≥95% detection at desk distance).
 
