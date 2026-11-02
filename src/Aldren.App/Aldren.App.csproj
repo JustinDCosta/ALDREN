@@ -11,7 +11,16 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationIcon>Assets\aldren.ico</ApplicationIcon>
+    <!-- Without this, an unpackaged publish leaves out the App's own .pri and .xbf files and no window can load. -->
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <!-- Program.cs holds the single-instance mutex before WinUI starts. -->
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\aldren.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" />

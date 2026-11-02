@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="Aldren.App.Settings.SettingsWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="ALDREN Settings">
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <NavigationView
+        x:Name="Navigation"
+        AutomationProperties.Name="Settings sections"
+        IsBackButtonVisible="Collapsed"
+        IsSettingsVisible="False"
+        PaneDisplayMode="Left"
+        SelectionChanged="OnSelectionChanged">
+        <NavigationView.MenuItems>
+            <NavigationViewItem Content="General" Tag="General" />
+            <NavigationViewItem Content="Voice &amp; wake word" Tag="Later:Phase 3" />
+            <NavigationViewItem Content="Local models" Tag="Later:Phase 2" />
+            <NavigationViewItem Content="Cloud (FreeLLMAPI)" Tag="Later:Phase 6" />
+            <NavigationViewItem Content="Permissions" Tag="Permissions" />
+            <NavigationViewItem Content="Privacy &amp; data" Tag="Later:Phase 4" />
+            <NavigationViewItem Content="Memory" Tag="Later:Phase 4" />
+            <NavigationViewItem Content="Reminders &amp; tasks" Tag="Later:Phase 4" />
+            <NavigationViewItem Content="Google account" Tag="Later:Phase 4" />
+            <NavigationViewItem Content="Focus mode" Tag="Later:Phase 8" />
+            <NavigationViewItem Content="Home &amp; away" Tag="Later:Phase 4" />
+            <NavigationViewItem Content="Modes" Tag="Later:Phase 9" />
+            <NavigationViewItem Content="Automations" Tag="Later:Phase 9" />
+            <NavigationViewItem Content="Activity history" Tag="Activity" />
+            <NavigationViewItem Content="Performance" Tag="Later:Phase 2" />
+            <NavigationViewItem Content="Diagnostics" Tag="Diagnostics" />
+        </NavigationView.MenuItems>
+        <ScrollViewer x:Name="Page" Padding="24,16" />
+    </NavigationView>
+</Window>
