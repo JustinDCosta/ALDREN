@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using System.Reflection;
 using Aldren.App.Expanded;
+using Aldren.App.Hotkeys;
 using Aldren.App.Ipc;
+using Aldren.App.Island;
 using Aldren.App.Settings;
 using Aldren.App.Tray;
 using Aldren.Common;
@@ -49,6 +51,30 @@ public partial class ShellApp : Application
 
     public Microsoft.Extensions.Logging.ILogger Log => _log;
 
+    public IslandWindow Island { get; private set; } = null!;
+
+    internal HotkeyService Hotkeys { get; private set; } = null!;
+
+    private async Task OnConnectedAsync(IAldrenCore core)
+    {
+        await RefreshTrayAsync();
+        try
+        {
+            ApplySettings(await core.GetSettingsAsync(CancellationToken.None));
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning("Couldn't read settings from Core: {Message}", ex.Message);
+        }
+    }
+
+    /// <summary>Applies settings the App acts on itself: the hotkey and whether the island shows on stream.</summary>
+    public void ApplySettings(AldrenSettings settings)
+    {
+        Hotkeys.Apply(settings.General.Hotkey);
+        Island.SetShowOnStream(settings.General.ShowOnStream);
+    }
+
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         DispatcherShutdownMode = DispatcherShutdownMode.OnExplicitShutdown;
@@ -67,9 +93,18 @@ public partial class ShellApp : Application
         // Leave the window procedure before touching WinUI.
         _tray.Command += command => _ui.TryEnqueue(() => RunLogged(() => OnTrayCommand(command), $"tray command {command}"));
 
+        Island = new IslandWindow(_loggers.CreateLogger<IslandWindow>());
+        Island.Submit = text => Core is { } core
+            ? core.SubmitTextAsync(text, CancellationToken.None)
+            : Task.FromResult("I'm not connected to ALDREN's background service right now.");
+        Island.ExpandRequested += ShowExpanded;
+        Hotkeys = new HotkeyService(_host, _loggers.CreateLogger<HotkeyService>());
+        Hotkeys.Pressed += () => _ui.TryEnqueue(() => RunLogged(Island.ToggleText, "hotkey"));
+        Hotkeys.Apply(AldrenSettings.Default.General.Hotkey);
+
         _watchdog = new CoreWatchdog(new CoreWatchdogPolicy(new RestartBackoff(TimeProvider.System)), _loggers.CreateLogger<CoreWatchdog>());
         _client = new CoreClient(new AppCallbacks(ConfirmAsync), _watchdog, _loggers.CreateLogger<CoreClient>());
-        _client.Connected += core => _ui.TryEnqueue(() => _ = RefreshTrayAsync());
+        _client.Connected += core => _ui.TryEnqueue(() => _ = OnConnectedAsync(core));
         _client.Disconnected += () => _ui.TryEnqueue(() => _tray.StartWithWindowsAvailable = false);
         _client.Start();
     }
@@ -174,9 +209,7 @@ public partial class ShellApp : Application
         return window;
     }
 
-    /// <summary>
-    /// Temporary confirmation prompt, a dialog in the expanded window; Task 13 moves it to the island.
-    /// </summary>
+    /// <summary>Core asks: the island shows the confirm state. Any failure counts as No.</summary>
     private Task<bool> ConfirmAsync(ConfirmationRequest request, CancellationToken ct)
     {
         var answer = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -184,33 +217,7 @@ public partial class ShellApp : Application
         {
             try
             {
-                ShowExpanded();
-                var window = _expanded!;
-                if (window.Content.XamlRoot is null)
-                {
-                    var loaded = new TaskCompletionSource();
-                    ((FrameworkElement)window.Content).Loaded += (_, _) => loaded.TrySetResult();
-                    await loaded.Task;
-                }
-
-                var text = $"{request.Summary}\n\nRisk: {request.Tier}";
-                if (request.UntrustedSources.Count > 0)
-                {
-                    text += $"\nSuggested while reading: {string.Join(", ", request.UntrustedSources)}";
-                }
-
-                var dialog = new ContentDialog
-                {
-                    Title = "Allow this action?",
-                    Content = text,
-                    PrimaryButtonText = "Yes",
-                    CloseButtonText = "No",
-                    DefaultButton = ContentDialogButton.Close,
-                    XamlRoot = window.Content.XamlRoot,
-                };
-                using var registration = ct.Register(() => _ui.TryEnqueue(dialog.Hide));
-                var result = await dialog.ShowAsync();
-                answer.TrySetResult(result == ContentDialogResult.Primary && !ct.IsCancellationRequested);
+                answer.TrySetResult(await Island.ConfirmAsync(request, ct));
             }
             catch (Exception ex)
             {
@@ -245,6 +252,8 @@ public partial class ShellApp : Application
 
         _expanded?.Close();
         _settings?.Close();
+        Hotkeys.Dispose();
+        Island.Close();
         _tray.Dispose();
         _host.Dispose();
         await _client.DisposeAsync();

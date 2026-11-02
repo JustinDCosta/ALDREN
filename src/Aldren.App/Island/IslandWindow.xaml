@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="Aldren.App.Island.IslandWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="ALDREN island">
+    <Grid x:Name="Root" Background="Transparent" RequestedTheme="Dark" KeyDown="OnRootKeyDown">
+        <!-- The pill itself is a Composition shape attached to PillHost; the content sits above it. -->
+        <Border x:Name="PillHost" />
+        <Grid
+            x:Name="Panel"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Top"
+            RowSpacing="8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock
+                x:Name="Caption"
+                VerticalAlignment="Center"
+                FontFamily="Segoe UI Variable Text"
+                FontSize="14"
+                Foreground="#E6FFFFFF"
+                IsTextSelectionEnabled="True"
+                TextAlignment="Center"
+                TextWrapping="Wrap"
+                TextTrimming="CharacterEllipsis" />
+
+            <TextBox
+                x:Name="Input"
+                Grid.Row="1"
+                AutomationProperties.Name="Message to ALDREN"
+                PlaceholderText="Ask ALDREN… (Enter sends, Ctrl+Enter expands, Esc closes)"
+                Visibility="Collapsed"
+                KeyDown="OnInputKeyDown"
+                TextChanged="OnInputTextChanged" />
+
+            <StackPanel
+                x:Name="ConfirmPanel"
+                Grid.RowSpan="2"
+                Spacing="8"
+                Visibility="Collapsed">
+                <TextBlock x:Name="ConfirmTitle" FontSize="16" FontWeight="SemiBold" Text="Allow this action?" />
+                <TextBlock x:Name="ConfirmSummary" TextWrapping="Wrap" />
+                <TextBlock x:Name="ConfirmTier" Foreground="#B3FFFFFF" />
+                <TextBlock x:Name="ConfirmSources" Foreground="#FFFFC864" TextWrapping="Wrap" Visibility="Collapsed" />
+                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="NoButton" AutomationProperties.Name="No" Content="No (N)" MinWidth="96" Click="OnNoClick" />
+                    <Button x:Name="YesButton" AutomationProperties.Name="Yes" Content="Yes (Y)" MinWidth="96" Style="{StaticResource AccentButtonStyle}" Click="OnYesClick" />
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

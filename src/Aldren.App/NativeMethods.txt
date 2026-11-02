@@ -16,3 +16,5 @@ DestroyMenu
 GetCursorPos
 SetForegroundWindow
 TRACK_POPUP_MENU_FLAGS
+RegisterHotKey
+UnregisterHotKey

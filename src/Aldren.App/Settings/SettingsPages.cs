@@ -86,7 +86,7 @@ public sealed class GeneralPage() : SettingsPage("General")
 
         var hotkey = Named(new TextBox { Header = "Hotkey for the text box", Text = settings.General.Hotkey, Width = 260, HorizontalAlignment = HorizontalAlignment.Left }, "Hotkey for the text box");
         Body.Children.Add(hotkey);
-        Paragraph("The hotkey is registered in the next step of Phase 1 (the island). If it's taken, ALDREN falls back to Ctrl+Alt+Shift+Space and says so here.");
+        var active = Paragraph(ActiveHotkeyText());
 
         var onStream = Named(new ToggleSwitch { Header = "Show ALDREN on stream", IsOn = settings.General.ShowOnStream }, "Show ALDREN on stream");
         Body.Children.Add(onStream);
@@ -102,10 +102,22 @@ public sealed class GeneralPage() : SettingsPage("General")
             if (saved.Saved)
             {
                 settings = updated;
+                ShellApp.Instance.ApplySettings(updated);
+                active.Text = ActiveHotkeyText();
             }
         };
         Body.Children.Add(save);
         Body.Children.Add(result);
+    }
+
+    private static string ActiveHotkeyText()
+    {
+        var hotkeys = ShellApp.Instance.Hotkeys;
+        return hotkeys.Active is not { } activeKey
+            ? "No hotkey is active: both the configured one and Ctrl+Alt+Shift+Space are taken by other apps."
+            : hotkeys.UsedFallback
+                ? $"Active hotkey: {activeKey}. The configured one is taken by another app, so ALDREN uses this fallback."
+                : $"Active hotkey: {activeKey}.";
     }
 }
 
@@ -187,8 +199,23 @@ public sealed class DiagnosticsPage() : SettingsPage("Diagnostics")
         Body.Children.Add(confirm);
         Body.Children.Add(redaction);
         Body.Children.Add(logs);
-        Paragraph("Island states can be previewed here once the island arrives (next step of Phase 1).");
         Body.Children.Add(result);
+
+        Paragraph("Preview each island state with sample content (the real ones arrive with voice in Phase 3):");
+        var states = new VariableSizedWrapGrid { Orientation = Orientation.Horizontal, ItemWidth = 130, ItemHeight = 40 };
+        foreach (var state in new[]
+                 {
+                     Island.IslandState.Compact, Island.IslandState.Listening, Island.IslandState.Transcribing,
+                     Island.IslandState.Thinking, Island.IslandState.Acting, Island.IslandState.Researching,
+                     Island.IslandState.Speaking, Island.IslandState.Error,
+                 })
+        {
+            var button = Named(new Button { Content = state.ToString() }, $"Preview the {state} state");
+            button.Click += (_, _) => ShellApp.Instance.Island.Preview(state);
+            states.Children.Add(button);
+        }
+
+        Body.Children.Add(states);
     }
 }
 
