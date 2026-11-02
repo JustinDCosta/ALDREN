@@ -2,7 +2,7 @@
 
 A local-first, JARVIS-inspired personal AI assistant for Windows 11. You summon it by saying "ALDREN" (pronounced *al-drin*) or by typing. It talks naturally, operates your apps, windows, files and browser through a safety-checked automation layer, understands your screen, manages reminders and your Google calendar, researches online when asked, and helps you focus.
 
-> **Status:** architecture approved on 2026-10-31. Phase 0 (prototypes and benchmarks) is done and its results await review; Phase 1 (foundation) is next. See [docs/STATUS.md](docs/STATUS.md).
+> **Status:** Phase 0 (prototypes and benchmarks) is done. Phase 1 (foundation) is implemented and awaiting its acceptance run: Core and the App, the tray, Settings, the island and hotkey, and the Tool Gateway with permissions and the audit log. See [docs/STATUS.md](docs/STATUS.md).
 
 ## Design in one minute
 
@@ -20,12 +20,29 @@ A local-first, JARVIS-inspired personal AI assistant for Windows 11. You summon 
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Phases 0–9, deliverables and exit criteria |
 | [docs/STATUS.md](docs/STATUS.md) | What is planned, implemented, tested, partially working or blocked |
 | [docs/plans/phase-0.md](docs/plans/phase-0.md) | Phase 0 plan: prototypes and benchmarks |
+| [docs/plans/phase-1.md](docs/plans/phase-1.md) | Phase 1 plan: foundation |
+| [docs/acceptance/phase-1.md](docs/acceptance/phase-1.md) | Phase 1 acceptance steps |
+| [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) | Pinned packages, licences and purposes |
 | [docs/benchmarks/phase0.md](docs/benchmarks/phase0.md) | Phase 0 results: measurements on this laptop and the decisions they led to |
 | [docs/SECURITY.md](docs/SECURITY.md) | Threat model, permissions, risk tiers, hardening |
 | [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) | Honest limits of the hardware, models and services |
 | [docs/decisions/](docs/decisions/README.md) | Architecture decision records: why each major choice was made |
 
-Setup and testing instructions arrive with Phase 1, when ALDREN itself has something to install. The Phase 0 prototypes are described, with how they were run, in the results.
+## Build, publish and run (Phase 1)
+
+Needs the .NET SDK 10.0.403 (pinned in `global.json`). Packages restore into `E:\AldrenData\cache\nuget`, in locked mode against each project's `packages.lock.json`.
+
+```
+dotnet build ALDREN.sln
+dotnet test tests\Aldren.Security.Tests
+powershell -ExecutionPolicy Bypass -File tools\dev\publish-local.ps1
+```
+
+The publish script puts Core and the App side by side in `E:\AldrenData\dev\aldren` (it refuses while ALDREN runs from there). Start `Aldren.Core.exe`: there is no window, only the tray icon. Core starts and supervises the App. The hotkey opens the island text box; the tray menu opens the conversation window and Settings; tray > Quit stops both. Settings live in `%APPDATA%\Aldren`, the database and logs in `%LOCALAPPDATA%\Aldren` (set `ALDREN_HOME` to move both).
+
+What to check after a build: [docs/acceptance/phase-1.md](docs/acceptance/phase-1.md). Idle CPU and memory: `dotnet run --project tools\bench -c Release -- idle --minutes 10`.
+
+The Phase 0 prototypes are described, with how they were run, in the results.
 
 ## Technology (planned)
 
