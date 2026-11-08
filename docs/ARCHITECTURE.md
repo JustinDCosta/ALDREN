@@ -266,6 +266,8 @@ If Phase 0 rejects the gateway, ALDREN uses direct adapters (Gemini, Groq, Mistr
 
 ## 9. Research pipeline
 
+> As built in Phase 6: the gateway's own search endpoint (`POST /v1/search`, needs a search engine key in its dashboard) with Wikipedia's public API as a keyless fallback; per-page summaries are replaced by question-relevant passages sent to the synthesis model, which has no tools, followed by the citation check.
+
 Decision record: [ADR-0008](decisions/0008-research-pipeline.md).
 
 1. **Trigger:** your explicit request, or a yes to "Want me to look that up online?".

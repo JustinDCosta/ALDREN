@@ -26,8 +26,27 @@ public sealed class CoreService(
     TimeProvider time,
     Aldren.Memory.MemoryStore memory,
     Aldren.Assistant.AssistantStore assistant,
-    Aldren.Presence.PresenceMonitor presence) : IAldrenCore
+    Aldren.Presence.PresenceMonitor presence,
+    Aldren.Cloud.GatewaySupervisor gateway) : IAldrenCore
 {
+    public Task<CloudStatusInfo> GetCloudStatusAsync(CancellationToken cancellationToken) => Task.FromResult(CloudStatus());
+
+    public Task<CloudStatusInfo> RecheckCloudAsync(CancellationToken cancellationToken)
+    {
+        gateway.Recheck();
+        return Task.FromResult(CloudStatus());
+    }
+
+    private CloudStatusInfo CloudStatus()
+    {
+        var s = gateway.Status;
+        var chains = s.Drift?.Chains.Select(c => c.State == Aldren.Cloud.ChainState.Ok
+            ? $"{c.Name}: ready ({string.Join(", ", c.Models.Take(4))})"
+            : $"{c.Name}: {c.State.ToString().ToLowerInvariant()}, {c.Problem}").ToList() ?? [];
+        return new CloudStatusInfo(settings.Current.Cloud.Enabled, s.Running, s.Port, s.Problem, chains,
+            s.Drift?.KeysOutsideAllowlist ?? [], settings.Current.Cloud.QuickFallback);
+    }
+
     public async Task<IReadOnlyList<MemoryItem>> GetMemoriesAsync(string? query, CancellationToken cancellationToken) =>
         (await memory.SearchAsync(query, 200, cancellationToken)).Select(m => new MemoryItem(m.Id, m.Text, m.Kind, m.Created)).ToList();
 

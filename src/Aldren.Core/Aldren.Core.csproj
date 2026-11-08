@@ -24,6 +24,8 @@
     <ProjectReference Include="..\Aldren.Assistant\Aldren.Assistant.csproj" />
     <ProjectReference Include="..\Aldren.Presence\Aldren.Presence.csproj" />
     <ProjectReference Include="..\Aldren.Perception\Aldren.Perception.csproj" />
+    <ProjectReference Include="..\Aldren.Cloud\Aldren.Cloud.csproj" />
+    <ProjectReference Include="..\Aldren.Research\Aldren.Research.csproj" />
   </ItemGroup>
 
 </Project>

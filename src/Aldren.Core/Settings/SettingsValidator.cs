@@ -26,6 +26,11 @@ public static class SettingsValidator
             errors.Add($"'{settings.Voice.PushToTalkHotkey}' isn't a valid push-to-talk hotkey.");
         }
 
+        if (settings.Cloud is null)
+        {
+            errors.Add("Cloud settings are missing.");
+        }
+
         if (settings.Presence is null)
         {
             errors.Add("Home & away settings are missing.");

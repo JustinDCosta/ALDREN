@@ -14,6 +14,12 @@ public sealed class SettingsMigrator(IReadOnlyDictionary<int, Func<JsonObject, J
             document["voice"] ??= new JsonObject();
             return document;
         },
+        // 3 → 4: the Cloud section (Phase 6), with its defaults.
+        [3] = document =>
+        {
+            document["cloud"] ??= new JsonObject();
+            return document;
+        },
         // 2 → 3: the Home & away section (Phase 4), with its defaults.
         [2] = document =>
         {

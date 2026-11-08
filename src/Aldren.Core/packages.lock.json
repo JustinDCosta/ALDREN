@@ -593,6 +593,15 @@
           "Microsoft.Extensions.Hosting": "[10.0.14, )"
         }
       },
+      "aldren.cloud": {
+        "type": "Project",
+        "dependencies": {
+          "Aldren.Memory": "[1.0.0, )",
+          "Aldren.Security": "[1.0.0, )",
+          "Microsoft.Data.Sqlite": "[10.0.14, )",
+          "Microsoft.Extensions.Hosting": "[10.0.14, )"
+        }
+      },
       "aldren.common": {
         "type": "Project",
         "dependencies": {
@@ -633,6 +642,14 @@
           "Microsoft.Extensions.Hosting": "[10.0.14, )"
         }
       },
+      "aldren.research": {
+        "type": "Project",
+        "dependencies": {
+          "Aldren.Cloud": "[1.0.0, )",
+          "AngleSharp": "[1.10.0, )",
+          "Microsoft.Extensions.Logging.Abstractions": "[10.0.14, )"
+        }
+      },
       "aldren.security": {
         "type": "Project",
         "dependencies": {
@@ -660,6 +677,12 @@
           "PdfPig": "[0.1.16, )",
           "System.Data.OleDb": "[10.0.14, )"
         }
+      },
+      "AngleSharp": {
+        "type": "CentralTransitive",
+        "requested": "[1.10.0, )",
+        "resolved": "1.10.0",
+        "contentHash": "jibGB16fKOT+p0T7/eMzsiHj/V43QXg/wGQot4VWHF3zEdH+RGco8rHFNeAbf526CrSOkA8WwILz3DDus+cUUA=="
       },
       "DocumentFormat.OpenXml": {
         "type": "CentralTransitive",

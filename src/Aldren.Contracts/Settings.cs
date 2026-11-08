@@ -1,10 +1,10 @@
 namespace Aldren.Contracts;
 
-public sealed record AldrenSettings(int SchemaVersion, GeneralSettings General, VoiceSettings Voice, PresenceSettings Presence)
+public sealed record AldrenSettings(int SchemaVersion, GeneralSettings General, VoiceSettings Voice, PresenceSettings Presence, CloudSettings Cloud)
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 
-    public static AldrenSettings Default { get; } = new(CurrentSchemaVersion, new GeneralSettings(), new VoiceSettings(), new PresenceSettings());
+    public static AldrenSettings Default { get; } = new(CurrentSchemaVersion, new GeneralSettings(), new VoiceSettings(), new PresenceSettings(), new CloudSettings());
 }
 
 public sealed record GeneralSettings(string Hotkey = "Ctrl+/", bool ShowOnStream = false);
@@ -25,5 +25,9 @@ public sealed record PresenceSettings(
     int GreetingAfterHours = 4,
     bool AwayMute = true,
     bool AwayMuteSkipHeadphones = true);
+
+/// <param name="Enabled">Runs the gateway and allows research when you ask; nothing is sent without your request.</param>
+/// <param name="QuickFallback">Off by default (ARCHITECTURE §22): non-personal questions go to aldren-fast only when the local model is unavailable.</param>
+public sealed record CloudSettings(bool Enabled = true, bool QuickFallback = false);
 
 public sealed record SettingsResult(bool Saved, IReadOnlyList<string> Errors);

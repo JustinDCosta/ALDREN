@@ -19,7 +19,7 @@
             <NavigationViewItem Content="General" Tag="General" />
             <NavigationViewItem Content="Voice &amp; wake word" Tag="Voice" />
             <NavigationViewItem Content="Local models" Tag="Later:Phase 2" />
-            <NavigationViewItem Content="Cloud (FreeLLMAPI)" Tag="Later:Phase 6" />
+            <NavigationViewItem Content="Cloud (FreeLLMAPI)" Tag="Cloud" />
             <NavigationViewItem Content="Permissions" Tag="Permissions" />
             <NavigationViewItem Content="Privacy &amp; data" Tag="Later:Phase 6" />
             <NavigationViewItem Content="Memory" Tag="Memory" />

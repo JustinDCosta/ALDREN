@@ -4,8 +4,8 @@ using Aldren.Inference;
 
 namespace Aldren.Core.Supervision;
 
-/// <summary>llama-server processes go in their own kill-on-close Job Object, so they never outlive Core (ARCHITECTURE §4).</summary>
-public sealed class InferenceHost(IProcessLauncher launcher, AldrenPaths paths) : IInferenceHost, IDisposable
+/// <summary>llama-server and the cloud gateway go in a kill-on-close Job Object, so they never outlive Core (ARCHITECTURE §4).</summary>
+public sealed class InferenceHost(IProcessLauncher launcher, AldrenPaths paths) : IInferenceHost, Aldren.Cloud.IProcessJob, IDisposable
 {
     private readonly ChildProcessJob _job = new();
 
@@ -19,6 +19,8 @@ public sealed class InferenceHost(IProcessLauncher launcher, AldrenPaths paths) 
             _job.Add(child);
         }
     }
+
+    void Aldren.Cloud.IProcessJob.Add(Process process) => AddToJob(process);
 
     public void Dispose() => _job.Dispose();
 }

@@ -11,4 +11,7 @@ public interface IAldrenApp
 
     /// <summary>The island follows the voice loop: listening, the transcript, thinking, the reply being spoken.</summary>
     Task ShowVoiceAsync(VoiceState state, string text, CancellationToken cancellationToken);
+
+    /// <summary>The cloud indicator: what is going online right now, or null when nothing is.</summary>
+    Task ShowCloudAsync(string? activity, CancellationToken cancellationToken);
 }

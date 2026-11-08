@@ -20,6 +20,7 @@ public sealed partial class Orchestrator(
     ResidencyManager residency,
     Aldren.Memory.MemoryStore memory,
     ActionBrain action,
+    ResearchBrain research,
     ICloudFallback cloud,
     TimeProvider time,
     ILogger<Orchestrator> log)
@@ -43,6 +44,7 @@ public sealed partial class Orchestrator(
 
     private readonly List<(string Role, string Content)> _turns = [];
     private readonly SemaphoreSlim _one = new(1, 1);
+    private string? _pendingResearch;
     private JsonArray? _toolSchemas;
 
     [GeneratedRegex(@"\b(look (?:it |that |this )?up|research|search (?:the )?(?:web|online|internet)|google|online|latest|news|current price)\b")]
@@ -86,6 +88,16 @@ public sealed partial class Orchestrator(
 
     private async Task<(string Reply, string Route)> RouteAsync(string text, Action<string>? onText, CancellationToken ct)
     {
+        // A yes to "want me to look that up online?" sends the earlier question; anything else drops the offer.
+        if (_pendingResearch is { } pending)
+        {
+            _pendingResearch = null;
+            if (FastPath.Normalize(text) is "yes" or "yes please" or "yeah" or "sure" or "go ahead" or "do it" or "please do" or "ok" or "okay" or "yep" or "look it up")
+            {
+                return await research.RunAsync(pending, ct);
+            }
+        }
+
         if (FastPath.Normalize(text) == "test confirmation")
         {
             var outcome = await InvokeAsync("diagnostics_confirm_test", [], Typed, ct);
@@ -114,7 +126,7 @@ public sealed partial class Orchestrator(
         var normalized = FastPath.Normalize(text);
         if (ResearchTrigger().IsMatch(normalized))
         {
-            return (ResearchNotYet, "router (research)");
+            return await research.RunAsync(text, ct);
         }
 
         if (ActionTrigger().IsMatch(normalized))
@@ -207,8 +219,11 @@ public sealed partial class Orchestrator(
 
                     if (call.Name == "request_research")
                     {
+                        // The model may suggest going online; only your yes sends anything (ARCHITECTURE §5.1 step 4).
                         await InvokeModelCallAsync(call, ct);
-                        return (ResearchNotYet, "quick brain → research");
+                        var asked = JsonNode.Parse(string.IsNullOrWhiteSpace(call.ArgumentsJson) ? "{}" : call.ArgumentsJson)?["request"]?.GetValue<string>();
+                        _pendingResearch = string.IsNullOrWhiteSpace(asked) ? text : asked;
+                        return ("I'd need to look that up online. Want me to?", "quick brain → asks before research");
                     }
 
                     // The same action twice in one reply ("stop", "stop") runs once.

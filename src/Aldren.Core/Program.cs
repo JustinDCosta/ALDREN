@@ -22,6 +22,7 @@ using Aldren.Security.Permissions;
 using Aldren.Security.Tools;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 using Serilog;
 
@@ -132,7 +133,24 @@ try
     builder.Services.AddSingleton<ResidencyManager>();
     builder.Services.AddSingleton<AppIndex>();
     builder.Services.AddSingleton<TimerService>();
-    builder.Services.AddSingleton<ICloudFallback, NoCloudFallback>();
+    builder.Services.AddSingleton<ICloudFallback, CloudFallback>();
+    builder.Services.AddSingleton<Aldren.Security.Secrets.ISecretStore, Aldren.Security.Secrets.CredentialManagerSecretStore>();
+    builder.Services.AddSingleton<Aldren.Cloud.IProcessJob>(sp => sp.GetRequiredService<InferenceHost>());
+    builder.Services.AddSingleton(sp => new Aldren.Cloud.GatewayOptions(
+        Path.Combine(sp.GetRequiredService<InferenceOptions>().DataRoot, "gateway"),
+        Path.Combine(paths.DataDirectory, "gateway", "freeapi.db"),
+        Path.Combine(paths.LogsDirectory, "gateway.log")));
+    builder.Services.AddSingleton(sp => new Aldren.Cloud.GatewaySupervisor(
+        sp.GetRequiredService<Aldren.Cloud.GatewayOptions>(), sp.GetRequiredService<Aldren.Security.Secrets.ISecretStore>(),
+        sp.GetRequiredService<Aldren.Cloud.IProcessJob>(), () => sp.GetRequiredService<SettingsStore>().Current.Cloud.Enabled,
+        sp.GetRequiredService<ILogger<Aldren.Cloud.GatewaySupervisor>>()));
+    builder.Services.AddSingleton<Aldren.Cloud.ICloudIndicator, AppCloudIndicator>();
+    builder.Services.AddSingleton(sp => new Aldren.Cloud.CloudPolicy(
+        sp.GetRequiredService<Aldren.Cloud.GatewaySupervisor>(), sp.GetRequiredService<IConfirmationBroker>(), sp.GetRequiredService<IAuditLog>(),
+        sp.GetRequiredService<Aldren.Cloud.ICloudIndicator>(), () => sp.GetRequiredService<SettingsStore>().Current.Cloud.Enabled,
+        sp.GetRequiredService<ILogger<Aldren.Cloud.CloudPolicy>>()));
+    builder.Services.AddSingleton<Aldren.Research.ResearchPipeline>();
+    builder.Services.AddSingleton<ResearchBrain>();
     builder.Services.AddSingleton(new VoiceOptions());
     builder.Services.AddSingleton<VoiceLoop>();
 
@@ -162,6 +180,7 @@ try
     builder.Services.AddHostedService(sp => sp.GetRequiredService<ReminderScheduler>());
     builder.Services.AddHostedService(sp => sp.GetRequiredService<PresenceMonitor>());
     builder.Services.AddHostedService<PresenceCoordinator>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<Aldren.Cloud.GatewaySupervisor>());
 
     using var host = builder.Build();
     var supervisor = host.Services.GetRequiredService<AppSupervisor>();

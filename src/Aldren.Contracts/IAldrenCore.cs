@@ -34,6 +34,11 @@ public interface IAldrenCore
 
     Task ForgetHomeNetworksAsync(CancellationToken cancellationToken);
 
+    Task<CloudStatusInfo> GetCloudStatusAsync(CancellationToken cancellationToken);
+
+    /// <summary>Runs the gateway drift check again (after you change the chains or keys in its dashboard).</summary>
+    Task<CloudStatusInfo> RecheckCloudAsync(CancellationToken cancellationToken);
+
     Task<AldrenSettings> GetSettingsAsync(CancellationToken cancellationToken);
 
     Task<SettingsResult> UpdateSettingsAsync(AldrenSettings settings, CancellationToken cancellationToken);

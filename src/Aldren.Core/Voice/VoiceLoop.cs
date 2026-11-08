@@ -444,14 +444,14 @@ public sealed class VoiceLoop(
             // The speech token, not the turn's: stopping ALDREN also stops it writing the rest of the reply.
             var reply = await orchestrator.HandleAsync(text, speech.Token, sentences.Push);
             // Fast-path replies arrive whole; a hand-off replaces whatever the model began to say.
-            if (!SameText(sentences.Text, reply))
+            if (!SameText(sentences.Text, Speakable(reply)))
             {
                 if (sentences.Text.Trim().Length > 0)
                 {
                     log.LogInformation("The final reply differs from the streamed text; speaking the final reply too");
                 }
 
-                sentences.Push(sentences.Text.Trim().Length > 0 ? " " + reply : reply);
+                sentences.Push(sentences.Text.Trim().Length > 0 ? " " + Speakable(reply) : Speakable(reply));
             }
 
             sentences.Complete();
@@ -474,6 +474,14 @@ public sealed class VoiceLoop(
                     (int)(speakStarted + first).TotalMilliseconds, (int)speakStarted.TotalMilliseconds);
             }
         }
+    }
+
+    /// <summary>What is said aloud: research replies lose their source list, links and [n] marks (shown on screen instead).</summary>
+    public static string Speakable(string reply)
+    {
+        var cut = reply.IndexOf(Orchestration.ResearchBrain.SourcesMarker, StringComparison.Ordinal);
+        var text = cut >= 0 ? reply[..cut] : reply;
+        return System.Text.RegularExpressions.Regex.Replace(text, @"\s*\[\d+(?:\s*,\s*\d+)*\]", "").Trim();
     }
 
     private static bool SameText(string streamed, string reply) =>

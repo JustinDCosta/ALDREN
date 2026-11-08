@@ -41,6 +41,11 @@
         "resolved": "3.1.4",
         "contentHash": "5mj99LvCqrq3CNi06xYdyIAXOEh+5b33F2nErCzI5zWiDdLHXiPXEWFSUAF8zlIv0ZWqjZNCwHTQeAPYbF3pCg=="
       },
+      "AngleSharp": {
+        "type": "Transitive",
+        "resolved": "1.10.0",
+        "contentHash": "jibGB16fKOT+p0T7/eMzsiHj/V43QXg/wGQot4VWHF3zEdH+RGco8rHFNeAbf526CrSOkA8WwILz3DDus+cUUA=="
+      },
       "DocumentFormat.OpenXml": {
         "type": "Transitive",
         "resolved": "3.5.1",
@@ -790,6 +795,15 @@
           "Microsoft.Extensions.Hosting": "[10.0.14, )"
         }
       },
+      "aldren.cloud": {
+        "type": "Project",
+        "dependencies": {
+          "Aldren.Memory": "[1.0.0, )",
+          "Aldren.Security": "[1.0.0, )",
+          "Microsoft.Data.Sqlite": "[10.0.14, )",
+          "Microsoft.Extensions.Hosting": "[10.0.14, )"
+        }
+      },
       "aldren.common": {
         "type": "Project",
         "dependencies": {
@@ -809,10 +823,12 @@
         "type": "Project",
         "dependencies": {
           "Aldren.Assistant": "[1.0.0, )",
+          "Aldren.Cloud": "[1.0.0, )",
           "Aldren.Inference": "[1.0.0, )",
           "Aldren.Memory": "[1.0.0, )",
           "Aldren.Perception": "[1.0.0, )",
           "Aldren.Presence": "[1.0.0, )",
+          "Aldren.Research": "[1.0.0, )",
           "Aldren.Security": "[1.0.0, )",
           "Aldren.Voice": "[1.0.0, )",
           "Aldren.Windows": "[1.0.0, )",
@@ -843,6 +859,14 @@
         "dependencies": {
           "Microsoft.Data.Sqlite": "[10.0.14, )",
           "Microsoft.Extensions.Hosting": "[10.0.14, )"
+        }
+      },
+      "aldren.research": {
+        "type": "Project",
+        "dependencies": {
+          "Aldren.Cloud": "[1.0.0, )",
+          "AngleSharp": "[1.10.0, )",
+          "Microsoft.Extensions.Logging.Abstractions": "[10.0.14, )"
         }
       },
       "aldren.security": {

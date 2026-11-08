@@ -28,6 +28,9 @@ Direct packages of the Phase 1 solution (`src/` and its tests). Versions for `sr
 | PdfPig | 0.1.16 | Apache-2.0 | Windows (files) | Reading PDFs locally (`qQcbsNMYVY+K…`) |
 | DocumentFormat.OpenXml | 3.5.1 | MIT | Windows (files) | Reading DOCX locally (`zxdOf5VVCe/u…`) |
 | System.Data.OleDb | 10.0.14 | MIT | Windows (files) | Read-only queries to the Windows Search index (`xYI6L1KwgZMk…`) |
+| AngleSharp | 1.10.0 | MIT | Research | Extracting the main text of fetched web pages (Phase 6; `jibGB16fKOT+…`) |
+
+Outside NuGet (Phase 6): portable Node.js 24.22.2 LTS for win-x64 in `E:\AldrenData\gateway\node-v24.22.2-win-x64`, SHA-256 `ca1bff5d8ead13c9f2ea404a176db46bd430704d5b5113734049fa365e7799e2` (nodejs.org SHASUMS256.txt), running the pinned FreeLLMAPI 0.16.14 in `E:\AldrenData\gateway\freellmapi-0.16.14`.
 
 Notable transitive packages: the Microsoft.Extensions 10.0.14 family, Serilog.Extensions.Logging 10.0.0, SQLitePCLRaw 2.1.13 (native SQLite), MessagePack, Nerdbank.MessagePack, Nerdbank.Streams, Newtonsoft.Json, Microsoft.VisualStudio.Threading and Microsoft.VisualStudio.Validation (via StreamJsonRpc), and CsWin32's Win32 metadata packages (build only).
 

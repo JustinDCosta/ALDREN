@@ -27,6 +27,7 @@ public sealed partial class SettingsWindow : Window
             "Memory" => new MemoryPage(),
             "Reminders" => new RemindersPage(),
             "Home" => new HomeAwayPage(),
+            "Cloud" => new CloudPage(),
             "Permissions" => new PermissionsPage(),
             "Activity" => new ActivityPage(),
             "Diagnostics" => new DiagnosticsPage(),

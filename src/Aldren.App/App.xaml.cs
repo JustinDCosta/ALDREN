@@ -182,7 +182,13 @@ public partial class ShellApp : Application
             new AppCallbacks(
                 ConfirmAsync,
                 (title, message) => _ui.TryEnqueue(() => _tray.ShowNotification(title, message)),
-                (state, text) => _ui.TryEnqueue(() => RunLogged(() => OnVoiceState(state, text), "voice state"))),
+                (state, text) => _ui.TryEnqueue(() => RunLogged(() => OnVoiceState(state, text), "voice state")),
+                activity => _ui.TryEnqueue(() => RunLogged(() =>
+                {
+                    // The cloud indicator: the tray says what's online, and the island shows it unless you're typing in it.
+                    _tray.SetTooltip(activity is null ? "ALDREN" : $"ALDREN · online: {activity}");
+                    Island.ShowCloud(activity);
+                }, "cloud indicator"))),
             _watchdog, _loggers.CreateLogger<CoreClient>());
         _client.Connected += core => _ui.TryEnqueue(() => _ = OnConnectedAsync(core));
         _client.Disconnected += () => _ui.TryEnqueue(() =>

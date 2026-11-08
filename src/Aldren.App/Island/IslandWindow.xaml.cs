@@ -260,6 +260,41 @@ public sealed partial class IslandWindow : Window
         }
     }
 
+    /// <summary>
+    /// The cloud indicator in the island: "researching" while something is online. Left alone while you type or confirm;
+    /// the tray tooltip still says it then.
+    /// </summary>
+    public void ShowCloud(string? activity)
+    {
+        if (activity is null)
+        {
+            if (State == IslandState.Researching)
+            {
+                Dismiss(restoreFocus: false);
+            }
+
+            return;
+        }
+
+        if (State is IslandState.Text or IslandState.Reply or IslandState.Confirm)
+        {
+            return;
+        }
+
+        if (State == IslandState.Hidden)
+        {
+            PlaceOnForegroundMonitor();
+        }
+
+        SetInteractive(false);
+        Input.Visibility = Visibility.Collapsed;
+        ConfirmPanel.Visibility = Visibility.Collapsed;
+        StopButton.Visibility = Visibility.Collapsed;
+        Caption.Text = $"🌐 {activity}…";
+        SetState(IslandState.Researching);
+        _idleTimer.Stop();
+    }
+
     /// <summary>About what the reply-sized island holds at 14 px, leaving room for the footer line.</summary>
     private const int LongReply = 380;
 

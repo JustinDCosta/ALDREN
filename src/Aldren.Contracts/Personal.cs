@@ -9,3 +9,7 @@ public sealed record TaskItem(long Id, string Text);
 
 /// <param name="State">Home, Away or Unknown.</param>
 public sealed record PresenceInfo(string State, bool Override, int HomeNetworks, bool CurrentIsHome);
+
+/// <param name="Chains">One line per aldren-* chain: its state and models.</param>
+public sealed record CloudStatusInfo(
+    bool Enabled, bool Running, int? Port, string? Problem, IReadOnlyList<string> Chains, IReadOnlyList<string> KeysOutsideAllowlist, bool QuickFallback);
