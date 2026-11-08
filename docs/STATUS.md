@@ -15,6 +15,7 @@ Labels: **Planned** · **In progress** · **Implemented** (code written, not yet
 | Phase 0 results | Approved | 2026-11-01, [summary](benchmarks/phase0.md#summary); ADR-0013 accepted. Open checks moved to the phases that need them (below) |
 | Phase 1 plan | Approved | 2026-11-02, [plans/phase-1.md](plans/phase-1.md); tests only for the Tool Gateway (your decision) |
 | Phase 2 plan | Approved | 2026-11-08, [plans/phase-2.md](plans/phase-2.md): short record, no installs or downloads, testing later (your decision) |
+| Phase 2 acceptance | Partially working | 2026-11-08, [acceptance/phase-2.md](acceptance/phase-2.md): you confirmed steps 1–13 (time, date, calculator, open, switch to and close Notepad with Yes/No, volume, mute, media, timer notification, chat, hand-offs, status, gaming mode with the CPU fallback). From the log: fast-path commands 7–35 ms; whole Quick Brain replies 0.7–1.3 s on the GPU (not streamed yet, so first token isn't measured separately); GPU model unloaded 58 ms after "gaming mode on"; CPU fallback answered in 3.2 s including its load; 4B ready 2.6 s after start (73 s the very first time after the reinstall). Skipped: step 14 (fullscreen game), so automatic game detection is untested. Found: "open youtube on chrome" opened Chrome and dropped YouTube instead of saying websites come in Phase 7 |
 | Phase 1 acceptance | Tested | 2026-11-02: you confirmed every step. Step 10 (10-minute idle) did land in `E:\AldrenData\bench\phase1\idle.md` at 01:58, after this file was last written: 0.01% CPU average, 125.4 MB peak, both pass |
 | Windows reinstall (2026-11-07) | Tested | 2026-11-08: .NET SDK 10.0.403 reinstalled from the pinned installer (SHA-512 checked); git `safe.directory` added for the repo (new Windows account); build has 0 errors (2 obsolete-API warnings, S3 spike only); all 124 unit tests pass; publish works; Core starts the App, which connects, with the fallback hotkey active. Recreated on first run: settings, database, logs. Lost: the S8 gateway database and its key (`key.dpapi` no longer decrypts), so the gateway is set up again in Phase 6. Start with Windows is off until you switch it back on |
 
@@ -60,7 +61,7 @@ Labels: **Planned** · **In progress** · **Implemented** (code written, not yet
 | Installer, updates, soak testing | 9 | Planned | |
 
 ## Waiting on you
-- Phase 2: the acceptance run, when you are ready (I write the steps). Close LM Studio first: its own llama-server keeps ~4.2 GB of VRAM, so ALDREN falls back to the slow CPU model.
+- Phase 2: step 14 (a fullscreen game for ~10 s, then `status`) when you have time.
 - Optional: tray > Start with Windows, if you want ALDREN to start at sign-in again (the reinstall removed the entry).
 - S4: the model 4 field listener stopped with the reinstall (its data up to 2026-11-01 is kept in `E:\AldrenData\voice\field`); restart it when you want more false alarms for the next retrain.
 - Before Phase 3, S3: a short live test on each microphone, unplugging the PD300X mid-capture once, and the Bluetooth headset check.
