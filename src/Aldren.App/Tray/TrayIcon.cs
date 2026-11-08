@@ -110,7 +110,7 @@ internal sealed unsafe class TrayIcon : IDisposable
     private void ShowMenu()
     {
         using var menu = new MenuHandle(PInvoke.CreatePopupMenu());
-        Append(menu, TrayCommand.Open, "Open ALDREN");
+        Append(menu, TrayCommand.Open, "Show conversation");
         Append(menu, TrayCommand.Settings, "Settings");
         PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
         Append(menu, TrayCommand.PauseListening, "Pause listening (Phase 3)", MENU_ITEM_FLAGS.MF_GRAYED);

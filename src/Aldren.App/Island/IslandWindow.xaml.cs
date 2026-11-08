@@ -83,6 +83,10 @@ public sealed partial class IslandWindow : Window
         centre.SetReferenceParameter("pill", _pill);
         _pill.StartAnimation("Offset", centre);
 
+        // handledEventsToo: the reply text is selectable and consumes the press itself, so a plain PointerPressed
+        // handler never saw clicks on the text, which is exactly where "click to read it all" is.
+        Root.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(OnRootPointerPressed), handledEventsToo: true);
+
         Panel.OpacityTransition = new ScalarTransition { Duration = TimeSpan.FromMilliseconds(120) };
         Panel.Opacity = 0;
 
@@ -140,6 +144,7 @@ public sealed partial class IslandWindow : Window
         Input.Text = "";
         Input.Visibility = Visibility.Visible;
         ConfirmPanel.Visibility = Visibility.Collapsed;
+        StopButton.Visibility = Visibility.Collapsed;
         Input.Focus(FocusState.Programmatic);
         RestartIdle();
     }
@@ -155,6 +160,7 @@ public sealed partial class IslandWindow : Window
         Caption.Text = "";
         Input.Visibility = Visibility.Collapsed;
         ConfirmPanel.Visibility = Visibility.Visible;
+        StopButton.Visibility = Visibility.Collapsed;
         ConfirmSummary.Text = request.Summary;
         ConfirmTier.Text = $"Risk: {request.Tier} · {request.Tool} · declined automatically after {request.TimeoutSeconds} s";
         ConfirmSources.Visibility = request.UntrustedSources.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -178,9 +184,129 @@ public sealed partial class IslandWindow : Window
         SetInteractive(false);
         Input.Visibility = Visibility.Collapsed;
         ConfirmPanel.Visibility = Visibility.Collapsed;
+        StopButton.Visibility = Visibility.Collapsed;
         Caption.Text = IslandShapes.Sample(state);
         SetState(state);
         RestartIdle();
+    }
+
+    /// <summary>The voice loop's live state, without taking focus: you keep typing in your app while ALDREN listens.</summary>
+    public void ShowVoice(VoiceState state, string text)
+    {
+        if (State == IslandState.Confirm)
+        {
+            return;
+        }
+
+        if (state == VoiceState.Idle)
+        {
+            if (State is IslandState.Listening or IslandState.Transcribing or IslandState.Thinking or IslandState.Speaking or IslandState.Reply)
+            {
+                Dismiss(restoreFocus: false);
+            }
+
+            return;
+        }
+
+        if (State is IslandState.Hidden)
+        {
+            PlaceOnForegroundMonitor();
+        }
+
+        SetInteractive(false);
+        Input.Visibility = Visibility.Collapsed;
+        ConfirmPanel.Visibility = Visibility.Collapsed;
+        var island = state switch
+        {
+            VoiceState.Listening => IslandState.Listening,
+            VoiceState.Transcribing => IslandState.Transcribing,
+            VoiceState.Thinking => IslandState.Thinking,
+            VoiceState.Speaking => text.Length > 90 ? IslandState.Reply : IslandState.Speaking,
+            _ => IslandState.Error,
+        };
+
+        if (state == VoiceState.Speaking)
+        {
+            _lastReply = text;
+        }
+
+        // The Stop button shows exactly while ALDREN speaks.
+        StopButton.Visibility = state == VoiceState.Speaking ? Visibility.Visible : Visibility.Collapsed;
+
+        if (island == IslandState.Reply)
+        {
+            Caption.Text = ReplyCaption(text, footer: "Click here to see the full reply.");
+        }
+        else if (state == VoiceState.Listening && State == IslandState.Reply && _lastReply is { } reply)
+        {
+            // The follow-up window keeps a long reply on screen instead of replacing it with "Anything else?".
+            island = IslandState.Reply;
+            Caption.Text = ReplyCaption(reply, footer: "Listening for a follow-up… Click here to see the full reply.");
+        }
+        else
+        {
+            Caption.Text = text;
+        }
+        SetState(island);
+        // Every voice state stays up until Core sends the next one (the turn always ends with Idle), however long ALDREN
+        // speaks; only an error collapses on its own.
+        if (state is VoiceState.Error)
+        {
+            RestartIdle();
+        }
+        else
+        {
+            _idleTimer.Stop();
+        }
+    }
+
+    /// <summary>About what the reply-sized island holds at 14 px, leaving room for the footer line.</summary>
+    private const int LongReply = 380;
+
+    private string? _lastReply;
+
+    /// <summary>The Stop button: ALDREN goes quiet and the voice turn ends.</summary>
+    public event Action? StopRequested;
+
+    private void OnStopClick(object sender, RoutedEventArgs e)
+    {
+        _log.LogInformation("Stop button clicked");
+        StopButton.Visibility = Visibility.Collapsed;
+        StopRequested?.Invoke();
+    }
+
+    private static string ReplyCaption(string reply, string footer) =>
+        (reply.Length > LongReply ? reply[..LongReply].TrimEnd() + "…" : reply) + "\n\n" + footer;
+
+    /// <summary>
+    /// A click on the island while it shows a voice turn or a reply opens the conversation window with the whole text.
+    /// Clicks in the text box, and on a confirmation, keep their usual meaning.
+    /// </summary>
+    private void OnRootPointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        var opensConversation = State is IslandState.Reply or IslandState.Speaking or IslandState.Listening
+            or IslandState.Transcribing or IslandState.Thinking;
+        var source = e.OriginalSource as DependencyObject;
+        if (!opensConversation || IsInside(source, Input) || IsInside(source, StopButton))
+        {
+            return;
+        }
+
+        _log.LogInformation("Island clicked in state {State}: opening the conversation window", State);
+        ExpandRequested?.Invoke();
+    }
+
+    private static bool IsInside(DependencyObject? element, DependencyObject container)
+    {
+        for (var current = element; current is not null; current = VisualTreeHelper.GetParent(current))
+        {
+            if (ReferenceEquals(current, container))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public void Dismiss(bool restoreFocus = true)

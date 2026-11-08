@@ -9,6 +9,8 @@ using Aldren.Core.Settings;
 using Aldren.Core.Startup;
 using Aldren.Core.Supervision;
 using Aldren.Core.Tools;
+using Aldren.Core.Voice;
+using Aldren.Voice;
 using Aldren.Inference;
 using Aldren.Windows.Apps;
 using Aldren.Security.Audit;
@@ -88,6 +90,8 @@ try
     builder.Services.AddSingleton<AppIndex>();
     builder.Services.AddSingleton<TimerService>();
     builder.Services.AddSingleton<ICloudFallback, NoCloudFallback>();
+    builder.Services.AddSingleton(new VoiceOptions());
+    builder.Services.AddSingleton<VoiceLoop>();
     builder.Services.AddSingleton<ToolRegistry>();
     builder.Services.AddSingleton<IToolPolicy, TierPolicy>();
     builder.Services.AddSingleton<IToolPolicy, TaintPolicy>();
@@ -98,6 +102,7 @@ try
     builder.Services.AddHostedService(sp => sp.GetRequiredService<AppSupervisor>());
     builder.Services.AddHostedService<AuditRetentionService>();
     builder.Services.AddHostedService(sp => sp.GetRequiredService<ResidencyManager>());
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<VoiceLoop>());
 
     using var host = builder.Build();
     var supervisor = host.Services.GetRequiredService<AppSupervisor>();

@@ -34,7 +34,7 @@ public sealed partial class Orchestrator(
     private static readonly string[] BrainTools =
     [
         "launch_app", "focus_app", "set_volume", "change_volume", "mute", "media_control", "start_timer",
-        "get_time", "get_date", "calculate", "delegate_to_action", "request_research",
+        "calculate", "delegate_to_action", "request_research",
     ];
 
     private readonly List<(string Role, string Content)> _turns = [];
@@ -44,10 +44,14 @@ public sealed partial class Orchestrator(
     [GeneratedRegex(@"\b(look (?:it |that |this )?up|research|search (?:the )?(?:web|online|internet)|google|online|latest|news|current price)\b")]
     private static partial Regex ResearchTrigger();
 
+    [GeneratedRegex(@"\bI(?:'ll| will|'ve| have|'m going to| am going to)(?: just)? (?:start|set|open|launch|play|pause|skip|stop|mute|unmute|turn|switch|close)(?:ed|ing)?\b", RegexOptions.IgnoreCase)]
+    private static partial Regex ClaimsAction();
+
     [GeneratedRegex(@"\b(on (?:my|the) screen|this error|this window|this page|this file|what am i looking at|whats this|what is this)\b")]
     private static partial Regex ActionTrigger();
 
-    public async Task<string> HandleAsync(string text, CancellationToken ct)
+    /// <param name="onText">Receives the Quick Brain's reply as it is written (for speech); fast-path replies only come back at the end.</param>
+    public async Task<string> HandleAsync(string text, CancellationToken ct, Action<string>? onText = null)
     {
         text = text.Trim();
         if (text.Length == 0)
@@ -64,7 +68,7 @@ public sealed partial class Orchestrator(
         var clock = Stopwatch.StartNew();
         try
         {
-            var (reply, route) = await RouteAsync(text, ct);
+            var (reply, route) = await RouteAsync(text, onText, ct);
             Remember("user", text);
             Remember("assistant", reply);
             log.LogInformation("Turn handled by {Route} in {Ms} ms", route, clock.ElapsedMilliseconds);
@@ -76,7 +80,7 @@ public sealed partial class Orchestrator(
         }
     }
 
-    private async Task<(string Reply, string Route)> RouteAsync(string text, CancellationToken ct)
+    private async Task<(string Reply, string Route)> RouteAsync(string text, Action<string>? onText, CancellationToken ct)
     {
         if (FastPath.Normalize(text) == "test confirmation")
         {
@@ -114,10 +118,10 @@ public sealed partial class Orchestrator(
             return (ActionNotYet, "router (action)");
         }
 
-        return await QuickBrainAsync(text, ct);
+        return await QuickBrainAsync(text, onText, ct);
     }
 
-    private async Task<(string Reply, string Route)> QuickBrainAsync(string text, CancellationToken ct)
+    private async Task<(string Reply, string Route)> QuickBrainAsync(string text, Action<string>? onText, CancellationToken ct)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(BrainTimeout);
@@ -148,11 +152,26 @@ public sealed partial class Orchestrator(
         {
             for (var round = 0; ; round++)
             {
-                var reply = await client.CompleteAsync(messages, round < MaxToolRounds ? tools : null, 400, timeout.Token);
+                // Tools only in the first round: after acting once, the model reports in words. A model that can't get
+                // what it wants from a tool otherwise keeps poking it (live: "what's the song?" → play/pause, stop, stop).
+                var roundTools = round == 0 ? tools : null;
+                var performed = new HashSet<string>(StringComparer.Ordinal);
+                var reply = onText is null
+                    ? await client.CompleteAsync(messages, roundTools, 400, timeout.Token)
+                    : await client.StreamAsync(messages, roundTools, 400, onText, timeout.Token);
                 log.LogInformation("{Model} answered in {Ms} ms ({Calls} tool calls)", reply.Model, (int)reply.Elapsed.TotalMilliseconds, reply.ToolCalls.Count);
                 if (reply.ToolCalls.Count == 0)
                 {
                     var answer = Clean(reply.Content);
+                    // The 4B sometimes promises an action without calling the tool ("I'll start a 30-minute timer"): say so.
+                    if (round == 0 && ClaimsAction().IsMatch(answer))
+                    {
+                        log.LogInformation("The model claimed an action without calling a tool");
+                        var note = " Actually, I haven't done that yet. Ask me directly and I will.";
+                        onText?.Invoke(note);
+                        answer += note;
+                    }
+
                     return (answer.Length > 0 ? answer : "I'm not sure what to say to that, boss.", $"quick brain ({tier})");
                 }
 
@@ -186,7 +205,10 @@ public sealed partial class Orchestrator(
                         return (ResearchNotYet, "quick brain → research");
                     }
 
-                    var outcome = await InvokeModelCallAsync(call, ct);
+                    // The same action twice in one reply ("stop", "stop") runs once.
+                    var outcome = performed.Add(call.Name + call.ArgumentsJson)
+                        ? await InvokeModelCallAsync(call, ct)
+                        : new ToolOutcome(ToolOutcomeStatus.Succeeded, null, "Already done above.");
                     messages.Add(new JsonObject
                     {
                         ["role"] = "tool",

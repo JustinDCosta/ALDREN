@@ -66,9 +66,12 @@ public static partial class FastPath
                 return Tool("mute", new JsonObject { ["mute"] = true });
             case "unmute" or "unmute the sound" or "unmute sound" or "unmute volume":
                 return Tool("mute", new JsonObject { ["mute"] = false });
-            case "pause" or "play" or "resume" or "pause the music" or "play the music" or "resume the music" or "pause music" or "play music" or "resume music":
+            case "pause" or "play" or "resume" or "pause the music" or "play the music" or "resume the music" or "pause music" or "play music" or "resume music"
+                or "play the song" or "play a song" or "play some music" or "pause the song" or "resume the song" or "pause it" or "play it"
+                or "resume playback" or "pause playback" or "unpause" or "play something":
                 return Tool("media_control", new JsonObject { ["action"] = "play_pause" });
-            case "next" or "next song" or "next track" or "skip" or "skip this song" or "skip song":
+            case "next" or "next song" or "next track" or "skip" or "skip this song" or "skip song" or "skip this one" or "skip it" or "skip this"
+                or "skip the song" or "skip this track" or "next one" or "play the next song" or "play the next one":
                 return Tool("media_control", new JsonObject { ["action"] = "next" });
             case "previous" or "previous song" or "previous track" or "last song" or "go back a song":
                 return Tool("media_control", new JsonObject { ["action"] = "previous" });

@@ -26,7 +26,8 @@ public static class IslandShapes
         IslandState.Hidden => (Vector2.Zero, 0),
         IslandState.Compact => (new Vector2(180, 36), 18),
         IslandState.Text => (new Vector2(440, 64), 28),
-        IslandState.Reply => (new Vector2(520, 170), 30),
+        // Up to the island window's height (260 less the top margin); anything longer is one click away in the sidebar.
+        IslandState.Reply => (new Vector2(560, 244), 30),
         IslandState.Confirm => (new Vector2(560, 230), 30),
         IslandState.Error => (new Vector2(420, 80), 28),
         _ => (new Vector2(420, 100), 30),

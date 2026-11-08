@@ -12,5 +12,8 @@
     <PackageVersion Include="Microsoft.Windows.CsWin32" Version="0.3.367" />
     <PackageVersion Include="Microsoft.WindowsAppSDK" Version="2.6.4" />
     <PackageVersion Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2957" />
+    <PackageVersion Include="NAudio" Version="3.3.0" />
+    <PackageVersion Include="org.k2fsa.sherpa.onnx" Version="2.0.1" />
+    <PackageVersion Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.28.0" />
   </ItemGroup>
 </Project>

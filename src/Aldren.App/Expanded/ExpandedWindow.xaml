@@ -3,18 +3,29 @@
     x:Class="Aldren.App.Expanded.ExpandedWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Title="ALDREN">
+    Title="ALDREN conversation">
     <Window.SystemBackdrop>
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
     <Grid x:Name="Root" Padding="16" RowSpacing="12">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
+        <Button
+            x:Name="StopSpeakingButton"
+            HorizontalAlignment="Stretch"
+            AutomationProperties.Name="Stop speaking"
+            Content="■  Stop speaking  (Esc)"
+            Style="{StaticResource AccentButtonStyle}"
+            Visibility="Collapsed"
+            Click="OnStopSpeakingClick" />
+
         <ListView
+            Grid.Row="1"
             x:Name="Conversation"
             AutomationProperties.Name="Conversation"
             SelectionMode="None">
@@ -25,7 +36,7 @@
             </ListView.ItemTemplate>
         </ListView>
 
-        <Grid Grid.Row="1" ColumnSpacing="8">
+        <Grid Grid.Row="2" ColumnSpacing="8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />

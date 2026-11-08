@@ -37,6 +37,18 @@
                 KeyDown="OnInputKeyDown"
                 TextChanged="OnInputTextChanged" />
 
+            <Button
+                x:Name="StopButton"
+                Grid.Row="1"
+                HorizontalAlignment="Center"
+                Padding="14,3"
+                MinHeight="26"
+                FontSize="12"
+                AutomationProperties.Name="Stop speaking"
+                Content="■  Stop  (Esc)"
+                Visibility="Collapsed"
+                Click="OnStopClick" />
+
             <StackPanel
                 x:Name="ConfirmPanel"
                 Grid.RowSpan="2"

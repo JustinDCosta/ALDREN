@@ -6,7 +6,15 @@ namespace Aldren.Core.Settings;
 /// <summary>Step n upgrades a settings document from version n to n + 1.</summary>
 public sealed class SettingsMigrator(IReadOnlyDictionary<int, Func<JsonObject, JsonObject>> steps)
 {
-    public static SettingsMigrator Default { get; } = new(new Dictionary<int, Func<JsonObject, JsonObject>>());
+    public static SettingsMigrator Default { get; } = new(new Dictionary<int, Func<JsonObject, JsonObject>>
+    {
+        // 1 → 2: the Voice section (Phase 3), with its defaults.
+        [1] = document =>
+        {
+            document["voice"] ??= new JsonObject();
+            return document;
+        },
+    });
 
     public int CurrentVersion => AldrenSettings.CurrentSchemaVersion;
 

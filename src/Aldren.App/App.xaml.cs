@@ -55,6 +55,62 @@ public partial class ShellApp : Application
 
     internal HotkeyService Hotkeys { get; private set; } = null!;
 
+    internal HotkeyService PushToTalk { get; private set; } = null!;
+
+    /// <summary>This session's conversation, typed and spoken, shown in the conversation window. In memory only (memory is Phase 4).</summary>
+    public System.Collections.ObjectModel.ObservableCollection<string> Conversation { get; } = [];
+
+    /// <summary>True from the first sound of a spoken reply until it ends or is stopped.</summary>
+    public bool IsSpeaking { get; private set; }
+
+    /// <summary>Raised on the UI thread when <see cref="IsSpeaking"/> changes.</summary>
+    public event Action<bool>? SpeakingChanged;
+
+    private StopKey _stopKey = null!;
+    private int? _replyEntry;
+
+    /// <summary>The Stop buttons and Escape: ALDREN goes quiet at once and the voice turn ends.</summary>
+    public void StopSpeaking()
+    {
+        if (Core is { } core)
+        {
+            _ = core.StopSpeakingAsync(CancellationToken.None);
+        }
+    }
+
+    /// <summary>Voice states from Core: the conversation log, the speaking flag (Stop button, Escape) and the island.</summary>
+    private void OnVoiceState(VoiceState state, string text)
+    {
+        if (state == VoiceState.Thinking)
+        {
+            Conversation.Add("You (voice): " + text);
+            _replyEntry = null;
+        }
+        else if (state == VoiceState.Speaking && text.Length > 0)
+        {
+            // The reply arrives twice: what was written when the first sound played, then all of it. One entry.
+            if (_replyEntry is int index && index < Conversation.Count)
+            {
+                Conversation[index] = "ALDREN: " + text;
+            }
+            else
+            {
+                Conversation.Add("ALDREN: " + text);
+                _replyEntry = Conversation.Count - 1;
+            }
+        }
+
+        var speaking = state == VoiceState.Speaking;
+        if (speaking != IsSpeaking)
+        {
+            IsSpeaking = speaking;
+            _stopKey.SetActive(speaking);
+            SpeakingChanged?.Invoke(speaking);
+        }
+
+        Island.ShowVoice(state, text);
+    }
+
     private async Task OnConnectedAsync(IAldrenCore core)
     {
         await RefreshTrayAsync();
@@ -72,6 +128,7 @@ public partial class ShellApp : Application
     public void ApplySettings(AldrenSettings settings)
     {
         Hotkeys.Apply(settings.General.Hotkey);
+        PushToTalk.Apply(settings.Voice.PushToTalkHotkey);
         Island.SetShowOnStream(settings.General.ShowOnStream);
     }
 
@@ -94,18 +151,46 @@ public partial class ShellApp : Application
         _tray.Command += command => _ui.TryEnqueue(() => RunLogged(() => OnTrayCommand(command), $"tray command {command}"));
 
         Island = new IslandWindow(_loggers.CreateLogger<IslandWindow>());
-        Island.Submit = text => Core is { } core
-            ? core.SubmitTextAsync(text, CancellationToken.None)
-            : Task.FromResult("I'm not connected to ALDREN's background service right now.");
+        Island.Submit = async text =>
+        {
+            Conversation.Add("You: " + text);
+            var reply = Core is { } core
+                ? await core.SubmitTextAsync(text, CancellationToken.None)
+                : "I'm not connected to ALDREN's background service right now.";
+            Conversation.Add("ALDREN: " + reply);
+            return reply;
+        };
         Island.ExpandRequested += ShowExpanded;
         Hotkeys = new HotkeyService(_host, _loggers.CreateLogger<HotkeyService>());
         Hotkeys.Pressed += () => _ui.TryEnqueue(() => RunLogged(Island.ToggleText, "hotkey"));
         Hotkeys.Apply(AldrenSettings.Default.General.Hotkey);
+        PushToTalk = new HotkeyService(_host, _loggers.CreateLogger<HotkeyService>(), id: 2, allowFallback: false);
+        PushToTalk.Pressed += () => _ui.TryEnqueue(() =>
+        {
+            if (Core is { } core)
+            {
+                _ = core.PushToTalkAsync(CancellationToken.None);
+            }
+        });
+        PushToTalk.Apply(AldrenSettings.Default.Voice.PushToTalkHotkey);
+        _stopKey = new StopKey(_host, _loggers.CreateLogger<StopKey>());
+        _stopKey.Pressed += () => _ui.TryEnqueue(StopSpeaking);
+        Island.StopRequested += StopSpeaking;
 
         _watchdog = new CoreWatchdog(new CoreWatchdogPolicy(new RestartBackoff(TimeProvider.System)), _loggers.CreateLogger<CoreWatchdog>());
-        _client = new CoreClient(new AppCallbacks(ConfirmAsync, (title, message) => _ui.TryEnqueue(() => _tray.ShowNotification(title, message))), _watchdog, _loggers.CreateLogger<CoreClient>());
+        _client = new CoreClient(
+            new AppCallbacks(
+                ConfirmAsync,
+                (title, message) => _ui.TryEnqueue(() => _tray.ShowNotification(title, message)),
+                (state, text) => _ui.TryEnqueue(() => RunLogged(() => OnVoiceState(state, text), "voice state"))),
+            _watchdog, _loggers.CreateLogger<CoreClient>());
         _client.Connected += core => _ui.TryEnqueue(() => _ = OnConnectedAsync(core));
-        _client.Disconnected += () => _ui.TryEnqueue(() => _tray.StartWithWindowsAvailable = false);
+        _client.Disconnected += () => _ui.TryEnqueue(() =>
+        {
+            _tray.StartWithWindowsAvailable = false;
+            // Core went away mid-reply: release Escape and close any voice state it can no longer end.
+            OnVoiceState(VoiceState.Idle, "");
+        });
         _client.Start();
     }
 
@@ -194,6 +279,8 @@ public partial class ShellApp : Application
     {
         _expanded ??= CreateWindow(new ExpandedWindow(), () => _expanded = null);
         _expanded.Activate();
+        // Opened from a click on the never-activated island: make sure it comes to the front rather than only flashing.
+        Aldren.App.Island.Native.Focus.SetForegroundWindow(WinRT.Interop.WindowNative.GetWindowHandle(_expanded));
     }
 
     public void ShowSettings()
@@ -253,6 +340,8 @@ public partial class ShellApp : Application
         _expanded?.Close();
         _settings?.Close();
         Hotkeys.Dispose();
+        PushToTalk.Dispose();
+        _stopKey.Dispose();
         Island.Close();
         _tray.Dispose();
         _host.Dispose();

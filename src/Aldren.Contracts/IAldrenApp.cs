@@ -8,4 +8,7 @@ public interface IAldrenApp
 
     /// <summary>Shows a notification, for example a finished timer.</summary>
     Task NotifyAsync(string title, string message, CancellationToken cancellationToken);
+
+    /// <summary>The island follows the voice loop: listening, the transcript, thinking, the reply being spoken.</summary>
+    Task ShowVoiceAsync(VoiceState state, string text, CancellationToken cancellationToken);
 }

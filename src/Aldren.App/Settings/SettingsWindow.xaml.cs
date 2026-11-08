@@ -23,6 +23,7 @@ public sealed partial class SettingsWindow : Window
         Page.Content = tag switch
         {
             "General" => new GeneralPage(),
+            "Voice" => new VoicePage(),
             "Permissions" => new PermissionsPage(),
             "Activity" => new ActivityPage(),
             "Diagnostics" => new DiagnosticsPage(),

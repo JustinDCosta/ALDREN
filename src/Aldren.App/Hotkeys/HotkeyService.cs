@@ -12,16 +12,20 @@ namespace Aldren.App.Hotkeys;
 /// </summary>
 internal sealed class HotkeyService : IDisposable
 {
-    private const int Id = 1;
+    private readonly int _id;
+    private readonly bool _allowFallback;
 
     private readonly HostWindow _host;
     private readonly ILogger _log;
     private bool _registered;
 
-    public HotkeyService(HostWindow host, ILogger log)
+    /// <param name="allowFallback">Only the text box falls back to Ctrl+Alt+Shift+Space.</param>
+    public HotkeyService(HostWindow host, ILogger log, int id = 1, bool allowFallback = true)
     {
         _host = host;
         _log = log;
+        _id = id;
+        _allowFallback = allowFallback;
         _host.Message += OnMessage;
     }
 
@@ -46,7 +50,7 @@ internal sealed class HotkeyService : IDisposable
         }
 
         Unregister();
-        (Active, UsedFallback) = HotkeyChooser.Choose(hotkey, Register);
+        (Active, UsedFallback) = _allowFallback ? HotkeyChooser.Choose(hotkey, Register) : (Register(hotkey) ? hotkey : null, false);
         _registered = Active is not null;
         if (Active is null)
         {
@@ -59,20 +63,20 @@ internal sealed class HotkeyService : IDisposable
     }
 
     private bool Register(Hotkey hotkey) =>
-        PInvoke.RegisterHotKey(_host.Handle, Id, (HOT_KEY_MODIFIERS)hotkey.Modifiers | HOT_KEY_MODIFIERS.MOD_NOREPEAT, hotkey.VirtualKey);
+        PInvoke.RegisterHotKey(_host.Handle, _id, (HOT_KEY_MODIFIERS)hotkey.Modifiers | HOT_KEY_MODIFIERS.MOD_NOREPEAT, hotkey.VirtualKey);
 
     private void Unregister()
     {
         if (_registered)
         {
-            PInvoke.UnregisterHotKey(_host.Handle, Id);
+            PInvoke.UnregisterHotKey(_host.Handle, _id);
             _registered = false;
         }
     }
 
     private void OnMessage(uint msg, nuint wParam, nint lParam)
     {
-        if (msg == HostWindow.WM_HOTKEY && wParam == Id)
+        if (msg == HostWindow.WM_HOTKEY && wParam == (nuint)_id)
         {
             Pressed?.Invoke();
         }

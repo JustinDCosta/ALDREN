@@ -11,15 +11,18 @@ public enum HotkeyModifiers
 }
 
 /// <summary>
-/// Ctrl and/or Alt, optional Shift, plus A–Z, 0–9, F1–F24 or Space. The Windows key is refused (Windows reserves it),
+/// Ctrl and/or Alt, optional Shift, plus A–Z, 0–9, F1–F24, Space, or the numeric keypad's * and / ("*" and "/"; keypad keys
+/// don't move with the keyboard layout). The Windows key is refused (Windows reserves it),
 /// and so is Ctrl+Alt+Delete.
 /// </summary>
 public readonly record struct Hotkey(HotkeyModifiers Modifiers, uint VirtualKey)
 {
     private const uint VkSpace = 0x20;
     private const uint VkF1 = 0x70;
+    private const uint VkMultiply = 0x6A;
+    private const uint VkDivide = 0x6F;
 
-    public static readonly Hotkey Default = new(HotkeyModifiers.Ctrl | HotkeyModifiers.Alt, VkSpace);
+    public static readonly Hotkey Default = new(HotkeyModifiers.Ctrl, VkDivide);
     public static readonly Hotkey Fallback = new(HotkeyModifiers.Ctrl | HotkeyModifiers.Alt | HotkeyModifiers.Shift, VkSpace);
 
     public static bool TryParse(string? text, out Hotkey hotkey)
@@ -68,6 +71,16 @@ public readonly record struct Hotkey(HotkeyModifiers Modifiers, uint VirtualKey)
             return true;
         }
 
+        switch (upper.Replace(" ", ""))
+        {
+            case "*" or "NUM*" or "MULTIPLY" or "NUMPADMULTIPLY":
+                key = VkMultiply;
+                return true;
+            case "/" or "NUM/" or "DIVIDE" or "NUMPADDIVIDE":
+                key = VkDivide;
+                return true;
+        }
+
         if (upper.Length == 1 && upper[0] is (>= 'A' and <= 'Z') or (>= '0' and <= '9'))
         {
             key = upper[0];
@@ -94,6 +107,8 @@ public readonly record struct Hotkey(HotkeyModifiers Modifiers, uint VirtualKey)
         {
             VkSpace => "Space",
             >= VkF1 and < VkF1 + 24 => "F" + (VirtualKey - VkF1 + 1),
+            VkMultiply => "Num *",
+            VkDivide => "Num /",
             _ => ((char)VirtualKey).ToString(),
         });
         return string.Join('+', parts);

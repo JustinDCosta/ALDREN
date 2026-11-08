@@ -2,7 +2,7 @@
 
 A local-first, JARVIS-inspired personal AI assistant for Windows 11. You summon it by saying "ALDREN" (pronounced *al-drin*) or by typing. It talks naturally, operates your apps, windows, files and browser through a safety-checked automation layer, understands your screen, manages reminders and your Google calendar, researches online when asked, and helps you focus.
 
-> **Status:** Phases 0 and 1 are done. Phase 2 (the text brain: local model, fast path, router, app launcher, system tools, gaming unload) is implemented and awaiting its acceptance run. See [docs/STATUS.md](docs/STATUS.md).
+> **Status:** Phases 0–2 are done. Phase 3 (voice: push-to-talk, speech recognition, spoken replies, an opt-in wake word) is implemented and awaiting its acceptance run. See [docs/STATUS.md](docs/STATUS.md).
 
 ## Design in one minute
 
@@ -22,6 +22,7 @@ A local-first, JARVIS-inspired personal AI assistant for Windows 11. You summon 
 | [docs/plans/phase-0.md](docs/plans/phase-0.md) | Phase 0 plan: prototypes and benchmarks |
 | [docs/plans/phase-1.md](docs/plans/phase-1.md) | Phase 1 plan: foundation |
 | [docs/plans/phase-2.md](docs/plans/phase-2.md) | Phase 2 plan: Quick Brain and orchestrator |
+| [docs/plans/phase-3.md](docs/plans/phase-3.md) | Phase 3 plan: voice |
 | [docs/acceptance/phase-1.md](docs/acceptance/phase-1.md) | Phase 1 acceptance steps |
 | [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) | Pinned packages, licences and purposes |
 | [docs/benchmarks/phase0.md](docs/benchmarks/phase0.md) | Phase 0 results: measurements on this laptop and the decisions they led to |

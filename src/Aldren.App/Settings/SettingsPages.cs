@@ -121,6 +121,53 @@ public sealed class GeneralPage() : SettingsPage("General")
     }
 }
 
+public sealed class VoicePage() : SettingsPage("Voice & wake word")
+{
+    protected override async Task LoadAsync(IAldrenCore core)
+    {
+        var settings = await core.GetSettingsAsync(CancellationToken.None);
+        var voice = settings.Voice;
+
+        var hotkey = Named(new TextBox { Header = "Push-to-talk hotkey", Text = voice.PushToTalkHotkey, Width = 260, HorizontalAlignment = HorizontalAlignment.Left }, "Push-to-talk hotkey");
+        Body.Children.Add(hotkey);
+        var active = Paragraph(ActiveText());
+        Paragraph("Press it, speak, and stop talking: ALDREN answers, then listens 8 s more for a follow-up. Press it again while ALDREN speaks to stop it.");
+
+        var speak = Named(new ToggleSwitch { Header = "Speak replies", IsOn = voice.SpeakReplies }, "Speak replies");
+        Body.Children.Add(speak);
+        Paragraph("ALDREN never speaks during gaming mode or while a fullscreen app runs; the reply shows in the island instead.");
+
+        var wake = Named(new ToggleSwitch { Header = "Wake word \"ALDREN\"", IsOn = voice.WakeWord }, "Wake word");
+        Body.Children.Add(wake);
+        Paragraph("Off by default: the wake word still triggers about 16 times an hour on everyday sound (the target is 0.5). When on, the microphone stays open and the Windows microphone indicator shows.");
+
+        var check = Named(new ToggleSwitch { Header = "Double-check the wake word with speech recognition", IsOn = voice.TranscriptCheck }, "Transcript check");
+        Body.Children.Add(check);
+        Paragraph("Fewer false wakes, but it also misses some real ones, because the recogniser sometimes hears \"ALDREN\" as another word.");
+
+        var result = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        var save = Named(new Button { Content = "Save" }, "Save voice settings");
+        save.Click += async (_, _) =>
+        {
+            var updated = settings with { Voice = new VoiceSettings(wake.IsOn, check.IsOn, speak.IsOn, hotkey.Text.Trim()) };
+            var saved = await core.UpdateSettingsAsync(updated, CancellationToken.None);
+            result.Text = saved.Saved ? "Saved." : string.Join(" ", saved.Errors);
+            if (saved.Saved)
+            {
+                settings = updated;
+                ShellApp.Instance.ApplySettings(updated);
+                active.Text = ActiveText();
+            }
+        };
+        Body.Children.Add(save);
+        Body.Children.Add(result);
+    }
+
+    private static string ActiveText() => ShellApp.Instance.PushToTalk.Active is { } key
+        ? $"Active: {key}."
+        : "No push-to-talk hotkey is active: that combination is taken by another app. Choose another.";
+}
+
 public sealed class PermissionsPage() : SettingsPage("Permissions")
 {
     protected override async Task LoadAsync(IAldrenCore core)

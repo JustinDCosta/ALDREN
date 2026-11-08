@@ -17,6 +17,106 @@ public sealed class ChatClient(LlamaServerProcess server)
 
     public string Model => Path.GetFileNameWithoutExtension(server.Launch.ModelPath);
 
+    /// <summary>
+    /// The same request streamed: <paramref name="onText"/> receives the reply's text as it is written, so speech can start
+    /// on the first sentence. Tool calls are assembled from their fragments and returned at the end.
+    /// </summary>
+    public async Task<ChatReply> StreamAsync(JsonArray messages, JsonArray? tools, int maxTokens, Action<string> onText, CancellationToken ct)
+    {
+        var body = Body(messages, tools, maxTokens);
+        body["stream"] = true;
+        var json = body.ToJsonString();
+        var clock = Stopwatch.StartNew();
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(server.BaseUri, "v1/chat/completions"))
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", server.ApiKey);
+        HttpResponseMessage response;
+        try
+        {
+            response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        }
+        catch (HttpRequestException)
+        {
+            // A dropped keep-alive connection fails before any byte arrives (Phase 0, S1): fall back to one plain retry.
+            return await CompleteAsync(messages, tools, maxTokens, ct);
+        }
+
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException($"llama-server answered {(int)response.StatusCode}: {Shorten(await response.Content.ReadAsStringAsync(ct))}");
+            }
+
+            var content = new StringBuilder();
+            var calls = new SortedDictionary<int, (string? Id, string? Name, StringBuilder Arguments)>();
+            using var reader = new StreamReader(await response.Content.ReadAsStreamAsync(ct));
+            while (await reader.ReadLineAsync(ct) is { } line)
+            {
+                if (!line.StartsWith("data:", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var data = line[5..].Trim();
+                if (data == "[DONE]")
+                {
+                    break;
+                }
+
+                var delta = JsonNode.Parse(data)?["choices"]?[0]?["delta"];
+                if (delta?["content"] is JsonValue text && text.TryGetValue(out string? piece) && piece.Length > 0)
+                {
+                    content.Append(piece);
+                    onText(piece);
+                }
+
+                if (delta?["tool_calls"] is JsonArray fragments)
+                {
+                    foreach (var fragment in fragments)
+                    {
+                        var index = fragment?["index"]?.GetValue<int>() ?? 0;
+                        var current = calls.TryGetValue(index, out var c) ? c : (null, null, new StringBuilder());
+                        current.Id ??= fragment?["id"]?.GetValue<string>();
+                        current.Name ??= fragment?["function"]?["name"]?.GetValue<string>();
+                        if (fragment?["function"]?["arguments"] is JsonValue args && args.TryGetValue(out string? argPiece))
+                        {
+                            current.Arguments.Append(argPiece);
+                        }
+
+                        calls[index] = current;
+                    }
+                }
+            }
+
+            var toolCalls = calls.Values
+                .Where(c => !string.IsNullOrEmpty(c.Name))
+                .Select(c => new ChatToolCall(c.Id ?? Guid.NewGuid().ToString("N"), c.Name!, c.Arguments.Length > 0 ? c.Arguments.ToString() : "{}"))
+                .ToList();
+            return new ChatReply(content.ToString().Trim(), toolCalls, clock.Elapsed, Model);
+        }
+    }
+
+    private static JsonObject Body(JsonArray messages, JsonArray? tools, int maxTokens)
+    {
+        var body = new JsonObject
+        {
+            ["messages"] = messages.DeepClone(),
+            ["max_tokens"] = maxTokens,
+            ["temperature"] = 0.3,
+            ["cache_prompt"] = true,
+            ["chat_template_kwargs"] = new JsonObject { ["enable_thinking"] = false },
+        };
+        if (tools is { Count: > 0 })
+        {
+            body["tools"] = tools.DeepClone();
+        }
+
+        return body;
+    }
+
     /// <param name="messages">OpenAI-style message objects.</param>
     /// <param name="tools">OpenAI-style function tools, or null.</param>
     public async Task<ChatReply> CompleteAsync(JsonArray messages, JsonArray? tools, int maxTokens, CancellationToken ct)

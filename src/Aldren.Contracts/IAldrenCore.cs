@@ -8,6 +8,12 @@ public interface IAldrenCore
     /// <summary>Sends typed text to the assistant and returns its reply.</summary>
     Task<string> SubmitTextAsync(string text, CancellationToken cancellationToken);
 
+    /// <summary>The push-to-talk hotkey: starts listening, or stops ALDREN speaking and listens.</summary>
+    Task PushToTalkAsync(CancellationToken cancellationToken);
+
+    /// <summary>The Stop button or Escape: ALDREN stops speaking (and writing the reply) at once, and the voice turn ends.</summary>
+    Task StopSpeakingAsync(CancellationToken cancellationToken);
+
     Task<AldrenSettings> GetSettingsAsync(CancellationToken cancellationToken);
 
     Task<SettingsResult> UpdateSettingsAsync(AldrenSettings settings, CancellationToken cancellationToken);

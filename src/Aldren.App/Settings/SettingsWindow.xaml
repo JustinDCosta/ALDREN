@@ -17,7 +17,7 @@
         SelectionChanged="OnSelectionChanged">
         <NavigationView.MenuItems>
             <NavigationViewItem Content="General" Tag="General" />
-            <NavigationViewItem Content="Voice &amp; wake word" Tag="Later:Phase 3" />
+            <NavigationViewItem Content="Voice &amp; wake word" Tag="Voice" />
             <NavigationViewItem Content="Local models" Tag="Later:Phase 2" />
             <NavigationViewItem Content="Cloud (FreeLLMAPI)" Tag="Later:Phase 6" />
             <NavigationViewItem Content="Permissions" Tag="Permissions" />
