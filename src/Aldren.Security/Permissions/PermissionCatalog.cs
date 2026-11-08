@@ -21,6 +21,13 @@ public sealed class PermissionCatalog
     public const string Tasks = "assistant.tasks";
     public const string Briefing = "assistant.briefing";
     public const string Presence = "presence.home";
+    public const string WindowsManage = "windows.manage";
+    public const string FilesRead = "files.read";
+    public const string FilesChange = "files.change";
+    public const string ScreenRead = "screen.read";
+    public const string ScreenAct = "screen.act";
+    public const string ClipboardRead = "clipboard.read";
+    public const string ClipboardWrite = "clipboard.write";
 
     private readonly Dictionary<string, PermissionDefinition> _definitions;
 
@@ -64,6 +71,18 @@ public sealed class PermissionCatalog
         new PermissionDefinition(Tasks, "Keep your task list", GrantedByDefault: true),
         new PermissionDefinition(Briefing, "Give the daily briefing", GrantedByDefault: true),
         new PermissionDefinition(Presence, "Know whether you're home (saving a home network asks first)", GrantedByDefault: true),
+    ]);
+
+    public static PermissionCatalog Phase5 { get; } = new(
+    [
+        .. Phase4.Definitions,
+        new PermissionDefinition(WindowsManage, "Move, snap and arrange windows, and use layouts", GrantedByDefault: true),
+        new PermissionDefinition(FilesRead, "Find, list and read your files", GrantedByDefault: true),
+        new PermissionDefinition(FilesChange, "Move, rename and recycle files (deleting asks first)", GrantedByDefault: true),
+        new PermissionDefinition(ScreenRead, "Read the window you're using (UI Automation, OCR, local vision)", GrantedByDefault: true),
+        new PermissionDefinition(ScreenAct, "Operate controls in apps (sensitive ones ask first)", GrantedByDefault: true),
+        new PermissionDefinition(ClipboardRead, "Read the clipboard when you ask", GrantedByDefault: true),
+        new PermissionDefinition(ClipboardWrite, "Copy text to the clipboard", GrantedByDefault: true),
     ]);
 
     public IReadOnlyCollection<PermissionDefinition> Definitions => _definitions.Values;

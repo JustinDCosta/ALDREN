@@ -24,6 +24,10 @@ Direct packages of the Phase 1 solution (`src/` and its tests). Versions for `sr
 | NAudio | 3.3.0 | MIT | Voice | Microphone capture (WASAPI), playback, audio-session ducking |
 | org.k2fsa.sherpa.onnx | 2.0.1 | Apache-2.0 | Voice | Silero VAD, Parakeet speech recognition, Supertonic speech; ships onnxruntime.dll 1.28.2 |
 | Microsoft.ML.OnnxRuntime.Managed | 1.28.0 | MIT | Voice | Wake-word feature models (openWakeWord); uses the onnxruntime.dll above. Added 2026-11-08 with your approval; lock hash `4ecKjwAS…1UlA==` |
+| FlaUI.UIA3 | 5.0.0 | MIT | Perception | UI Automation snapshots and control actions (Phase 5; lock hash `s1Yy1RsRJ0OX…`) |
+| PdfPig | 0.1.16 | Apache-2.0 | Windows (files) | Reading PDFs locally (`qQcbsNMYVY+K…`) |
+| DocumentFormat.OpenXml | 3.5.1 | MIT | Windows (files) | Reading DOCX locally (`zxdOf5VVCe/u…`) |
+| System.Data.OleDb | 10.0.14 | MIT | Windows (files) | Read-only queries to the Windows Search index (`xYI6L1KwgZMk…`) |
 
 Notable transitive packages: the Microsoft.Extensions 10.0.14 family, Serilog.Extensions.Logging 10.0.0, SQLitePCLRaw 2.1.13 (native SQLite), MessagePack, Nerdbank.MessagePack, Nerdbank.Streams, Newtonsoft.Json, Microsoft.VisualStudio.Threading and Microsoft.VisualStudio.Validation (via StreamJsonRpc), and CsWin32's Win32 metadata packages (build only).
 

@@ -48,6 +48,13 @@ public sealed class ToolGateway(
                 ToolOutcomeStatus.InvalidArguments, "Invalid arguments: " + string.Join(" ", bound.Errors), ct);
         }
 
+        // A tool may raise its tier for particular arguments ("press Send" over "press Next"), never lower it.
+        var tier = tool.TierFor(bound.Value!);
+        if (tier > descriptor.Tier)
+        {
+            descriptor = descriptor with { Tier = tier };
+        }
+
         if (!permissions.IsGranted(descriptor.Permission))
         {
             return await RefuseAsync(call, context, descriptor.Tier, arguments, started,

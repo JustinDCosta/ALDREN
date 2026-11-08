@@ -94,6 +94,11 @@ public static partial class FastPath
             return personal;
         }
 
+        if (WindowFileCommand(p) is { } windowOrFile)
+        {
+            return windowOrFile;
+        }
+
         if (VolumeTo().Match(p) is { Success: true } v && ParseNumber(v.Groups["n"].Value) is { } level && level <= 100)
         {
             return Tool("set_volume", new JsonObject { ["level"] = level });
@@ -163,6 +168,84 @@ public static partial class FastPath
 
     [GeneratedRegex(@"^(?:mark (?<q>.+?)(?: as)? (?:done|complete|completed|finished)|(?:tick|check|cross) off (?<q2>.+))$")]
     private static partial Regex CompleteTask();
+
+    [GeneratedRegex(@"^(?:snap|move|put|dock) (?<app>.+?) (?:to )?(?:the )?(?<side>left|right|top|bottom)(?: half| side| of the screen)?$")]
+    private static partial Regex Snap();
+
+    [GeneratedRegex(@"^(?<verb>maximi[sz]e|minimi[sz]e|restore|cent(?:er|re)) (?<app>.+)$")]
+    private static partial Regex WindowVerb();
+
+    [GeneratedRegex(@"^move (?<app>.+?) to the other (?:monitor|screen|display)$")]
+    private static partial Regex OtherMonitor();
+
+    [GeneratedRegex(@"^(?:save|remember) (?:this|the current|my) (?:window )?layout as (?<name>.+)$")]
+    private static partial Regex SaveLayout();
+
+    [GeneratedRegex(@"^(?:apply|load|use|restore|switch to|set up|open|go to) (?:the |my )?(?<name>.+?) layout$")]
+    private static partial Regex ApplyLayout();
+
+    [GeneratedRegex(@"^(?:find (?:my |the )?(?<q>.+?) (?:file|document|pdf|spreadsheet)|find (?:the )?files? (?:called |named )?(?<q2>.+))$")]
+    private static partial Regex FindFile();
+
+    private static FastCommand? WindowFileCommand(string p)
+    {
+        switch (p)
+        {
+            case "show my downloads" or "whats in my downloads" or "list my downloads" or "my downloads" or "show downloads" or "what did i download"
+                or "latest downloads" or "show my latest downloads":
+                return Tool("list_downloads", []);
+            case "open my downloads" or "open downloads" or "open my downloads folder" or "open the downloads folder":
+                return Tool("open_file", new JsonObject { ["path"] = "downloads" });
+            case "show my recent files" or "recent files" or "my recent files" or "what did i open recently" or "what files did i open recently":
+                return Tool("recent_files", []);
+            case "undo" or "undo that" or "undo the last move" or "undo the rename" or "undo the last file change" or "put it back":
+                return Tool("undo_file_action", []);
+            case "list my windows" or "what windows are open" or "which windows are open" or "show my windows":
+                return Tool("list_windows", []);
+            case "list my layouts" or "what layouts do i have" or "show my layouts":
+                return Tool("list_layouts", []);
+        }
+
+        if (Snap().Match(p) is { Success: true } snap)
+        {
+            return Tool("move_window", new JsonObject { ["app"] = snap.Groups["app"].Value, ["placement"] = snap.Groups["side"].Value });
+        }
+
+        if (OtherMonitor().Match(p) is { Success: true } other)
+        {
+            return Tool("move_window", new JsonObject { ["app"] = other.Groups["app"].Value, ["placement"] = "other_monitor" });
+        }
+
+        if (WindowVerb().Match(p) is { Success: true } verb && !IsVague(verb.Groups["app"].Value.Replace("this window", "x").Replace("this", "x")))
+        {
+            var placement = verb.Groups["verb"].Value switch
+            {
+                var v when v.StartsWith("maxim", StringComparison.Ordinal) => "maximize",
+                var v when v.StartsWith("minim", StringComparison.Ordinal) => "minimize",
+                "restore" => "restore",
+                _ => "center",
+            };
+            var app = verb.Groups["app"].Value is "this" or "this window" or "it" ? "this" : verb.Groups["app"].Value;
+            return Tool("move_window", new JsonObject { ["app"] = app, ["placement"] = placement });
+        }
+
+        if (SaveLayout().Match(p) is { Success: true } save)
+        {
+            return Tool("save_layout", new JsonObject { ["text"] = save.Groups["name"].Value });
+        }
+
+        if (ApplyLayout().Match(p) is { Success: true } apply)
+        {
+            return Tool("apply_layout", new JsonObject { ["text"] = apply.Groups["name"].Value });
+        }
+
+        if (FindFile().Match(p) is { Success: true } find)
+        {
+            return Tool("find_files", new JsonObject { ["query"] = find.Groups["q"].Success ? find.Groups["q"].Value : find.Groups["q2"].Value });
+        }
+
+        return null;
+    }
 
     private static FastCommand? PersonalCommand(string p)
     {

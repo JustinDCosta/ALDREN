@@ -14,6 +14,9 @@ public interface ITool
 
     string Summarize(object arguments);
 
+    /// <summary>The tier for these arguments; the gateway only ever uses it to raise the declared tier.</summary>
+    RiskTier TierFor(object arguments) => Descriptor.Tier;
+
     Task<object?> RunAsync(object arguments, CancellationToken ct);
 
     Task<bool> VerifyAsync(object arguments, object? result, CancellationToken ct);

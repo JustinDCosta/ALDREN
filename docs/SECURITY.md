@@ -42,6 +42,8 @@ The gateway fails closed: if it can't write the audit log, nothing above tier 0 
 
 Deletes go to the Recycle Bin unless you explicitly ask for permanent deletion (tier 3, confirmed).
 
+A tool can raise its tier for particular arguments, never lower it (Phase 5): pressing a control named "Send", "Pay", "Delete", "Sign out" and the like is tier 3, while "Next" stays tier 1; text that looks like a password or card number makes typing it tier 4. While screen, document or clipboard content is in the model's context, its calls carry that content as taint, so tier 2 and above are always confirmed.
+
 ## Permissions
 You grant permissions in Settings, per capability (for example files: read-only vs modify; browser: read vs interact; per-site levels). They are stored where no tool can write. ALDREN's own folders (settings, database, logs) are off-limits to every tool. A model can never grant, widen or bypass a permission.
 

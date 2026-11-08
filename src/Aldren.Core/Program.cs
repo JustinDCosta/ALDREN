@@ -32,6 +32,9 @@ if (instance is null)
     return 0;
 }
 
+// Window and UI Automation coordinates in physical pixels on every monitor (Phase 5); a process setting, nothing persistent.
+Aldren.Windows.Layouts.WindowManager.BecomeDpiAware();
+
 var paths = AldrenPaths.FromEnvironment();
 Directory.CreateDirectory(paths.SettingsDirectory);
 DataFolderAcl.RestrictToCurrentUser(paths.DataDirectory);
@@ -68,7 +71,7 @@ try
     builder.Services.AddSingleton<IRegistryValues, CurrentUserRegistry>();
     builder.Services.AddSingleton<StartupEntry>();
 
-    builder.Services.AddSingleton(PermissionCatalog.Phase4);
+    builder.Services.AddSingleton(PermissionCatalog.Phase5);
     builder.Services.AddSingleton<IPermissionStore>(sp => new PermissionStore(paths.PermissionsFile, sp.GetRequiredService<PermissionCatalog>()));
     builder.Services.AddSingleton<IAuditLog>(new SqliteAuditLog(paths.DatabasePath));
     builder.Services.AddSingleton<ITool, GetTimeTool>();
@@ -99,6 +102,29 @@ try
     builder.Services.AddSingleton<ITool, PresenceStatusTool>();
     builder.Services.AddSingleton<ITool, SetHomeNetworkTool>();
     builder.Services.AddSingleton<ITool, ImHomeTool>();
+    builder.Services.AddSingleton<ITool, ListWindowsTool>();
+    builder.Services.AddSingleton<ITool, MoveWindowTool>();
+    builder.Services.AddSingleton<ITool, SaveLayoutTool>();
+    builder.Services.AddSingleton<ITool, ApplyLayoutTool>();
+    builder.Services.AddSingleton<ITool, ListLayoutsTool>();
+    builder.Services.AddSingleton<ITool, FindFilesTool>();
+    builder.Services.AddSingleton<ITool, RecentFilesTool>();
+    builder.Services.AddSingleton<ITool, DownloadsTool>();
+    builder.Services.AddSingleton<ITool, VsCodeRecentTool>();
+    builder.Services.AddSingleton<ITool, OpenFileTool>();
+    builder.Services.AddSingleton<ITool, ReadDocumentTool>();
+    builder.Services.AddSingleton<ITool, MoveFileTool>();
+    builder.Services.AddSingleton<ITool, RenameFileTool>();
+    builder.Services.AddSingleton<ITool, DeleteFileTool>();
+    builder.Services.AddSingleton<ITool, FindDuplicatesTool>();
+    builder.Services.AddSingleton<ITool, UndoFileTool>();
+    builder.Services.AddSingleton<ITool, LookAtScreenTool>();
+    builder.Services.AddSingleton<ITool, FindControlTool>();
+    builder.Services.AddSingleton<ITool, PressControlTool>();
+    builder.Services.AddSingleton<ITool, TypeIntoControlTool>();
+    builder.Services.AddSingleton<ITool, OperateControlTool>();
+    builder.Services.AddSingleton<ITool, ReadClipboardTool>();
+    builder.Services.AddSingleton<ITool, CopyTextTool>();
 
     builder.Services.AddSingleton(new InferenceOptions());
     builder.Services.AddSingleton<InferenceHost>();
@@ -117,6 +143,11 @@ try
     builder.Services.AddSingleton<IReminderSink, ReminderDelivery>();
     builder.Services.AddSingleton<ReminderScheduler>();
     builder.Services.AddSingleton<PresenceMonitor>();
+    builder.Services.AddSingleton<Aldren.Perception.UiaService>();
+    builder.Services.AddSingleton<Aldren.Core.Perception.ScreenReader>();
+    builder.Services.AddSingleton<ActionBrain>();
+    builder.Services.AddSingleton(sp => new Aldren.Windows.Layouts.LayoutStore(Path.Combine(paths.DataDirectory, "layouts.json"), sp.GetRequiredService<AppIndex>()));
+    builder.Services.AddSingleton(new Aldren.Windows.Files.FileOperations(paths.DatabasePath));
     builder.Services.AddSingleton<ToolRegistry>();
     builder.Services.AddSingleton<IToolPolicy, TierPolicy>();
     builder.Services.AddSingleton<IToolPolicy, TaintPolicy>();

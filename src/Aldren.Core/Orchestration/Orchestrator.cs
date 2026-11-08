@@ -19,6 +19,7 @@ public sealed partial class Orchestrator(
     ToolRegistry registry,
     ResidencyManager residency,
     Aldren.Memory.MemoryStore memory,
+    ActionBrain action,
     ICloudFallback cloud,
     TimeProvider time,
     ILogger<Orchestrator> log)
@@ -49,8 +50,8 @@ public sealed partial class Orchestrator(
 
     [GeneratedRegex(@"\bI(?:'ll| will|'ve| have|'m going to| am going to)(?: just)? (?:start|set|open|launch|play|pause|skip|stop|mute|unmute|turn|switch|close)(?:ed|ing)?\b", RegexOptions.IgnoreCase)]
     private static partial Regex ClaimsAction();
-
-    [GeneratedRegex(@"\b(on (?:my|the) screen|this error|this window|this page|this file|what am i looking at|whats this|what is this)\b")]
+    // Screen, window, file and clipboard requests go straight to the Action Brain (Phase 5).
+    [GeneratedRegex(@"\b(on (?:my|the) screen|this error|this window|this page|this file|this folder|what am i looking at|whats this|what is this|click|press the|tap on|type (?:into|in the)|fill in|scroll|the (?:first|second|third|last) (?:one|result|link|item)|select the|snap|arrange|layout|monitor|window|file|files|folder|document|pdf|downloads|clipboard|copied|duplicates?|rename|move (?:it|this|that|the))\b")]
     private static partial Regex ActionTrigger();
 
     /// <param name="onText">Receives the Quick Brain's reply as it is written (for speech); fast-path replies only come back at the end.</param>
@@ -118,7 +119,7 @@ public sealed partial class Orchestrator(
 
         if (ActionTrigger().IsMatch(normalized))
         {
-            return (ActionNotYet, "router (action)");
+            return await action.RunAsync(text, onText, ct);
         }
 
         return await QuickBrainAsync(text, onText, ct);
@@ -195,11 +196,13 @@ public sealed partial class Orchestrator(
 
                 foreach (var call in reply.ToolCalls)
                 {
-                    // Handing off ends the turn with a fixed answer: the model shouldn't improvise one.
+                    // Handing off: the Action Brain takes the request from here.
                     if (call.Name == "delegate_to_action")
                     {
                         await InvokeModelCallAsync(call, ct);
-                        return (ActionNotYet, "quick brain → action");
+                        var handed = JsonNode.Parse(string.IsNullOrWhiteSpace(call.ArgumentsJson) ? "{}" : call.ArgumentsJson)?["request"]?.GetValue<string>();
+                        var (actionReply, actionRoute) = await action.RunAsync(string.IsNullOrWhiteSpace(handed) ? text : handed, onText, ct);
+                        return (actionReply, "quick brain → " + actionRoute);
                     }
 
                     if (call.Name == "request_research")

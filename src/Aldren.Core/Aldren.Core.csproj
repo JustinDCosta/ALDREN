@@ -3,7 +3,7 @@
   <PropertyGroup>
     <!-- WinExe: Core runs in the background and must never open a console window. -->
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>false</SelfContained>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -23,6 +23,7 @@
     <ProjectReference Include="..\Aldren.Memory\Aldren.Memory.csproj" />
     <ProjectReference Include="..\Aldren.Assistant\Aldren.Assistant.csproj" />
     <ProjectReference Include="..\Aldren.Presence\Aldren.Presence.csproj" />
+    <ProjectReference Include="..\Aldren.Perception\Aldren.Perception.csproj" />
   </ItemGroup>
 
 </Project>

@@ -22,6 +22,9 @@ public abstract class Tool<TArgs, TResult> : ITool where TArgs : class
     /// <summary>Checks beyond the schema.</summary>
     public virtual IEnumerable<string> Validate(TArgs args) => [];
 
+    /// <summary>A higher tier for particular arguments; the gateway ignores anything lower than <see cref="Tier"/>.</summary>
+    public virtual RiskTier TierFor(TArgs args) => Tier;
+
     /// <summary>The action in plain words, for a confirmation.</summary>
     public virtual string Summarize(TArgs args) => Description;
 
@@ -43,6 +46,8 @@ public abstract class Tool<TArgs, TResult> : ITool where TArgs : class
     }
 
     string ITool.Summarize(object arguments) => Summarize((TArgs)arguments);
+
+    RiskTier ITool.TierFor(object arguments) => TierFor((TArgs)arguments);
 
     async Task<object?> ITool.RunAsync(object arguments, CancellationToken ct) => await ExecuteAsync((TArgs)arguments, ct);
 
