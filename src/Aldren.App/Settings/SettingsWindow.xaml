@@ -21,12 +21,12 @@
             <NavigationViewItem Content="Local models" Tag="Later:Phase 2" />
             <NavigationViewItem Content="Cloud (FreeLLMAPI)" Tag="Later:Phase 6" />
             <NavigationViewItem Content="Permissions" Tag="Permissions" />
-            <NavigationViewItem Content="Privacy &amp; data" Tag="Later:Phase 4" />
-            <NavigationViewItem Content="Memory" Tag="Later:Phase 4" />
-            <NavigationViewItem Content="Reminders &amp; tasks" Tag="Later:Phase 4" />
-            <NavigationViewItem Content="Google account" Tag="Later:Phase 4" />
+            <NavigationViewItem Content="Privacy &amp; data" Tag="Later:Phase 6" />
+            <NavigationViewItem Content="Memory" Tag="Memory" />
+            <NavigationViewItem Content="Reminders &amp; tasks" Tag="Reminders" />
+            <NavigationViewItem Content="Google account" Tag="Later:Phase 4 (blocked: needs your Google Cloud project, see docs/guides/google-oauth.md)" />
             <NavigationViewItem Content="Focus mode" Tag="Later:Phase 8" />
-            <NavigationViewItem Content="Home &amp; away" Tag="Later:Phase 4" />
+            <NavigationViewItem Content="Home &amp; away" Tag="Home" />
             <NavigationViewItem Content="Modes" Tag="Later:Phase 9" />
             <NavigationViewItem Content="Automations" Tag="Later:Phase 9" />
             <NavigationViewItem Content="Activity history" Tag="Activity" />

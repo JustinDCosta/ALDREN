@@ -15,6 +15,12 @@ public sealed class PermissionCatalog
     public const string Timers = "assistant.timers";
     public const string Calculator = "assistant.calculator";
     public const string Delegation = "assistant.delegation";
+    public const string MemoryRead = "memory.read";
+    public const string MemoryWrite = "memory.write";
+    public const string Reminders = "assistant.reminders";
+    public const string Tasks = "assistant.tasks";
+    public const string Briefing = "assistant.briefing";
+    public const string Presence = "presence.home";
 
     private readonly Dictionary<string, PermissionDefinition> _definitions;
 
@@ -47,6 +53,17 @@ public sealed class PermissionCatalog
         new PermissionDefinition(Timers, "Set timers", GrantedByDefault: true),
         new PermissionDefinition(Calculator, "Do calculations", GrantedByDefault: true),
         new PermissionDefinition(Delegation, "Hand requests to the Action and Research brains", GrantedByDefault: true),
+    ]);
+
+    public static PermissionCatalog Phase4 { get; } = new(
+    [
+        .. Phase2.Definitions,
+        new PermissionDefinition(MemoryRead, "Recall what you asked ALDREN to remember", GrantedByDefault: true),
+        new PermissionDefinition(MemoryWrite, "Remember and forget things (forgetting asks first)", GrantedByDefault: true),
+        new PermissionDefinition(Reminders, "Create, list and cancel reminders (cancelling asks first)", GrantedByDefault: true),
+        new PermissionDefinition(Tasks, "Keep your task list", GrantedByDefault: true),
+        new PermissionDefinition(Briefing, "Give the daily briefing", GrantedByDefault: true),
+        new PermissionDefinition(Presence, "Know whether you're home (saving a home network asks first)", GrantedByDefault: true),
     ]);
 
     public IReadOnlyCollection<PermissionDefinition> Definitions => _definitions.Values;

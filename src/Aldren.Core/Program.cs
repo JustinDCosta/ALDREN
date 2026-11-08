@@ -11,6 +11,9 @@ using Aldren.Core.Supervision;
 using Aldren.Core.Tools;
 using Aldren.Core.Voice;
 using Aldren.Voice;
+using Aldren.Assistant;
+using Aldren.Memory;
+using Aldren.Presence;
 using Aldren.Inference;
 using Aldren.Windows.Apps;
 using Aldren.Security.Audit;
@@ -65,7 +68,7 @@ try
     builder.Services.AddSingleton<IRegistryValues, CurrentUserRegistry>();
     builder.Services.AddSingleton<StartupEntry>();
 
-    builder.Services.AddSingleton(PermissionCatalog.Phase2);
+    builder.Services.AddSingleton(PermissionCatalog.Phase4);
     builder.Services.AddSingleton<IPermissionStore>(sp => new PermissionStore(paths.PermissionsFile, sp.GetRequiredService<PermissionCatalog>()));
     builder.Services.AddSingleton<IAuditLog>(new SqliteAuditLog(paths.DatabasePath));
     builder.Services.AddSingleton<ITool, GetTimeTool>();
@@ -82,6 +85,20 @@ try
     builder.Services.AddSingleton<ITool, MediaControlTool>();
     builder.Services.AddSingleton<ITool, DelegateToActionTool>();
     builder.Services.AddSingleton<ITool, RequestResearchTool>();
+    builder.Services.AddSingleton<ITool, RememberTool>();
+    builder.Services.AddSingleton<ITool, RecallTool>();
+    builder.Services.AddSingleton<ITool, ForgetTool>();
+    builder.Services.AddSingleton<ITool, CreateReminderTool>();
+    builder.Services.AddSingleton<ITool, ListRemindersTool>();
+    builder.Services.AddSingleton<ITool, CancelReminderTool>();
+    builder.Services.AddSingleton<ITool, SnoozeReminderTool>();
+    builder.Services.AddSingleton<ITool, AddTaskTool>();
+    builder.Services.AddSingleton<ITool, ListTasksTool>();
+    builder.Services.AddSingleton<ITool, CompleteTaskTool>();
+    builder.Services.AddSingleton<ITool, DailyBriefingTool>();
+    builder.Services.AddSingleton<ITool, PresenceStatusTool>();
+    builder.Services.AddSingleton<ITool, SetHomeNetworkTool>();
+    builder.Services.AddSingleton<ITool, ImHomeTool>();
 
     builder.Services.AddSingleton(new InferenceOptions());
     builder.Services.AddSingleton<InferenceHost>();
@@ -92,6 +109,14 @@ try
     builder.Services.AddSingleton<ICloudFallback, NoCloudFallback>();
     builder.Services.AddSingleton(new VoiceOptions());
     builder.Services.AddSingleton<VoiceLoop>();
+
+    builder.Services.AddSingleton(new MemoryStore(paths.DatabasePath));
+    builder.Services.AddSingleton(sp => new AssistantStore(paths.DatabasePath, sp.GetRequiredService<TimeProvider>()));
+    builder.Services.AddSingleton(new PresenceStore(paths.DatabasePath));
+    builder.Services.AddSingleton<Briefing>();
+    builder.Services.AddSingleton<IReminderSink, ReminderDelivery>();
+    builder.Services.AddSingleton<ReminderScheduler>();
+    builder.Services.AddSingleton<PresenceMonitor>();
     builder.Services.AddSingleton<ToolRegistry>();
     builder.Services.AddSingleton<IToolPolicy, TierPolicy>();
     builder.Services.AddSingleton<IToolPolicy, TaintPolicy>();
@@ -103,6 +128,9 @@ try
     builder.Services.AddHostedService<AuditRetentionService>();
     builder.Services.AddHostedService(sp => sp.GetRequiredService<ResidencyManager>());
     builder.Services.AddHostedService(sp => sp.GetRequiredService<VoiceLoop>());
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<ReminderScheduler>());
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<PresenceMonitor>());
+    builder.Services.AddHostedService<PresenceCoordinator>();
 
     using var host = builder.Build();
     var supervisor = host.Services.GetRequiredService<AppSupervisor>();

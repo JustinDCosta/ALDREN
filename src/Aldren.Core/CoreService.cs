@@ -23,8 +23,68 @@ public sealed class CoreService(
     StartupEntry startup,
     AppSupervisor supervisor,
     IHostApplicationLifetime lifetime,
-    TimeProvider time) : IAldrenCore
+    TimeProvider time,
+    Aldren.Memory.MemoryStore memory,
+    Aldren.Assistant.AssistantStore assistant,
+    Aldren.Presence.PresenceMonitor presence) : IAldrenCore
 {
+    public async Task<IReadOnlyList<MemoryItem>> GetMemoriesAsync(string? query, CancellationToken cancellationToken) =>
+        (await memory.SearchAsync(query, 200, cancellationToken)).Select(m => new MemoryItem(m.Id, m.Text, m.Kind, m.Created)).ToList();
+
+    public async Task DeleteMemoryAsync(long id, CancellationToken cancellationToken)
+    {
+        await memory.DeleteAsync(id, cancellationToken);
+        await AuditUserActionAsync("delete_memory", $$"""{"id":{{id}}}""", "Deleted from Settings > Memory");
+    }
+
+    public async Task<IReadOnlyList<ReminderItem>> GetRemindersAsync(CancellationToken cancellationToken) =>
+        (await assistant.ActiveRemindersAsync(cancellationToken))
+            .Select(r => new ReminderItem(r.Id, r.Text, Tools.ListRemindersTool.Describe(r, assistant))).ToList();
+
+    public async Task CancelReminderAsync(long id, CancellationToken cancellationToken)
+    {
+        await assistant.CancelReminderAsync(id, cancellationToken);
+        await AuditUserActionAsync("cancel_reminder", $$"""{"id":{{id}}}""", "Cancelled from Settings > Reminders & tasks");
+    }
+
+    public async Task<IReadOnlyList<TaskItem>> GetTasksAsync(CancellationToken cancellationToken) =>
+        (await assistant.OpenTasksAsync(cancellationToken)).Select(t => new TaskItem(t.Id, t.Text)).ToList();
+
+    public async Task CompleteTaskAsync(long id, CancellationToken cancellationToken)
+    {
+        await assistant.CompleteTaskAsync(id, cancellationToken);
+        await AuditUserActionAsync("complete_task", $$"""{"id":{{id}}}""", "Completed from Settings > Reminders & tasks");
+    }
+
+    public Task<PresenceInfo> GetPresenceAsync(CancellationToken cancellationToken)
+    {
+        var s = presence.Snapshot();
+        return Task.FromResult(new PresenceInfo(s.State.ToString(), s.Override, s.HomeNetworks, s.CurrentIsHome));
+    }
+
+    public async Task<string> SetHomeNetworkAsync(CancellationToken cancellationToken)
+    {
+        var saved = await presence.SaveCurrentAsHomeAsync(cancellationToken);
+        await AuditUserActionAsync("set_home_network", "{}", $"Saved from Settings > Home & away ({saved} network(s))");
+        return saved == 0
+            ? "No network could be identified, so nothing was saved. Is the PC connected?"
+            : "Saved: this network is now home.";
+    }
+
+    public async Task ForgetHomeNetworksAsync(CancellationToken cancellationToken)
+    {
+        await presence.ForgetHomeAsync(cancellationToken);
+        await AuditUserActionAsync("forget_home_networks", "{}", "Cleared from Settings > Home & away");
+    }
+
+    /// <summary>Changes you make in Settings are audited like tool calls, as user-origin actions.</summary>
+    private Task AuditUserActionAsync(string action, string arguments, string detail) =>
+        audit.AppendAsync(
+            new AuditRecord(
+                time.GetUtcNow(), Guid.NewGuid().ToString("N"), action, RiskTier.Reversible, CallOrigin.User, arguments,
+                AuditStage.Finished, ToolOutcomeStatus.Succeeded, detail, TimeSpan.Zero, Confirmed: false, Tainted: false),
+            CancellationToken.None);
+
     private static readonly string Version =
         typeof(CoreService).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
 

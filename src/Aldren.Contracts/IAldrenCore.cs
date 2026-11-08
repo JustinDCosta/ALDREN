@@ -14,6 +14,26 @@ public interface IAldrenCore
     /// <summary>The Stop button or Escape: ALDREN stops speaking (and writing the reply) at once, and the voice turn ends.</summary>
     Task StopSpeakingAsync(CancellationToken cancellationToken);
 
+    /// <summary>The memory inspector: keyword search, or the latest when the query is empty.</summary>
+    Task<IReadOnlyList<MemoryItem>> GetMemoriesAsync(string? query, CancellationToken cancellationToken);
+
+    Task DeleteMemoryAsync(long id, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<ReminderItem>> GetRemindersAsync(CancellationToken cancellationToken);
+
+    Task CancelReminderAsync(long id, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<TaskItem>> GetTasksAsync(CancellationToken cancellationToken);
+
+    Task CompleteTaskAsync(long id, CancellationToken cancellationToken);
+
+    Task<PresenceInfo> GetPresenceAsync(CancellationToken cancellationToken);
+
+    /// <summary>Saves the network the PC is on as home (from Settings, on your click). Returns what happened, in words.</summary>
+    Task<string> SetHomeNetworkAsync(CancellationToken cancellationToken);
+
+    Task ForgetHomeNetworksAsync(CancellationToken cancellationToken);
+
     Task<AldrenSettings> GetSettingsAsync(CancellationToken cancellationToken);
 
     Task<SettingsResult> UpdateSettingsAsync(AldrenSettings settings, CancellationToken cancellationToken);

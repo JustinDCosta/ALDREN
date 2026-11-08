@@ -18,6 +18,7 @@ public sealed partial class Orchestrator(
     ToolGateway gateway,
     ToolRegistry registry,
     ResidencyManager residency,
+    Aldren.Memory.MemoryStore memory,
     ICloudFallback cloud,
     TimeProvider time,
     ILogger<Orchestrator> log)
@@ -35,6 +36,8 @@ public sealed partial class Orchestrator(
     [
         "launch_app", "focus_app", "set_volume", "change_volume", "mute", "media_control", "start_timer",
         "calculate", "delegate_to_action", "request_research",
+        "remember", "recall", "forget", "create_reminder", "list_reminders", "cancel_reminder", "snooze_reminder",
+        "add_task", "list_tasks", "complete_task", "daily_briefing", "presence_status",
     ];
 
     private readonly List<(string Role, string Content)> _turns = [];
@@ -145,7 +148,7 @@ public sealed partial class Orchestrator(
             messages.Add(new JsonObject { ["role"] = role, ["content"] = content });
         }
 
-        messages.Add(new JsonObject { ["role"] = "user", ["content"] = $"{text}\n\n[Context: {Context()}]" });
+        messages.Add(new JsonObject { ["role"] = "user", ["content"] = $"{text}\n\n[Context: {Context()}{await MemoryContextAsync(text, ct)}]" });
 
         var tools = tier == ModelTier.Gpu ? ToolSchemas() : null;
         try
@@ -285,6 +288,26 @@ public sealed partial class Orchestrator(
         return _toolSchemas = tools;
     }
 
+    /// <summary>
+    /// What you asked ALDREN to remember that bears on this request: profile facts always, plus the best keyword matches,
+    /// within a small budget (ARCHITECTURE §5.4). Local only; memories never leave the PC.
+    /// </summary>
+    private async Task<string> MemoryContextAsync(string text, CancellationToken ct)
+    {
+        try
+        {
+            var facts = (await memory.ProfileAsync(ct)).Concat(await memory.SearchAsync(text, 3, ct))
+                .Select(m => m.Text).Distinct().Take(8).ToList();
+            var joined = string.Join("; ", facts);
+            return facts.Count == 0 ? "" : $"; things the user asked you to remember: {(joined.Length > 600 ? joined[..600] : joined)}";
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            log.LogWarning(ex, "Memory lookup failed");
+            return "";
+        }
+    }
+
     private string Context()
     {
         var now = time.GetLocalNow();
@@ -339,7 +362,8 @@ public sealed partial class Orchestrator(
             },
             "start_timer" => $"Timer set for {r?["duration"]}; it ends at {r?["ends"]}.",
             "calculate" => $"{r?["expression"]} = {r?["result"]}.",
-            _ => "Done.",
+            // Phase 4 tools return a ready-to-say message.
+            _ => r is JsonObject o && o["message"] is JsonValue m && m.TryGetValue(out string? said) ? said : "Done.",
         };
     }
 

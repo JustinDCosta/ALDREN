@@ -89,6 +89,11 @@ public static partial class FastPath
                 return new StatusCommand();
         }
 
+        if (PersonalCommand(p) is { } personal)
+        {
+            return personal;
+        }
+
         if (VolumeTo().Match(p) is { Success: true } v && ParseNumber(v.Groups["n"].Value) is { } level && level <= 100)
         {
             return Tool("set_volume", new JsonObject { ["level"] = level });
@@ -132,6 +137,148 @@ public static partial class FastPath
         return null;
     }
 
+    [GeneratedRegex(@"^remember(?: that)? (?<what>(?!to ).{3,300})$")]
+    private static partial Regex RememberThat();
+
+    [GeneratedRegex(@"^what (?:do|else do) you (?:remember|know)(?: about (?<q>.+))?$")]
+    private static partial Regex Recall();
+
+    [GeneratedRegex(@"^forget(?: that| about)? (?<what>.{3,200})$")]
+    private static partial Regex Forget();
+
+    [GeneratedRegex(@"^(?:remind me|set (?:a |an )?reminder|set me a reminder)(?: for| to)? (?<rest>.+)$")]
+    private static partial Regex RemindMe();
+
+    [GeneratedRegex(@"\b(?:in|at|on|by|tomorrow|tonight|today|every|each|daily|next|this)\b")]
+    private static partial Regex TimeStart();
+
+    [GeneratedRegex(@"^(?:cancel|delete|remove) (?:the |my )?reminder (?:to |about |for )?(?<q>.+)$")]
+    private static partial Regex CancelReminder();
+
+    [GeneratedRegex(@"^snooze(?: it| that| this)?(?: for)?(?: (?<n>\d+|[a-z]+) (?:minutes?|mins?))?$")]
+    private static partial Regex Snooze();
+
+    [GeneratedRegex(@"^(?:add (?<t>.+?) to (?:my )?(?:to do|todo|task|tasks)(?: list)?|add (?:a )?(?:new )?task(?: to)? (?<t2>.+)|new task (?<t3>.+))$")]
+    private static partial Regex AddTask();
+
+    [GeneratedRegex(@"^(?:mark (?<q>.+?)(?: as)? (?:done|complete|completed|finished)|(?:tick|check|cross) off (?<q2>.+))$")]
+    private static partial Regex CompleteTask();
+
+    private static FastCommand? PersonalCommand(string p)
+    {
+        switch (p)
+        {
+            case "what are my reminders" or "list my reminders" or "show my reminders" or "what reminders do i have" or "do i have any reminders"
+                or "my reminders" or "list reminders" or "show reminders":
+                return Tool("list_reminders", []);
+            case "whats on my to do list" or "what is on my to do list" or "whats on my todo list" or "what is on my todo list" or "show my tasks"
+                or "list my tasks" or "what are my tasks" or "my tasks" or "my to do list" or "my todo list" or "what do i have to do":
+                return Tool("list_tasks", []);
+            case "good morning" or "brief me" or "daily briefing" or "give me my briefing" or "my briefing" or "morning briefing"
+                or "whats my day" or "whats my day like" or "what does my day look like" or "whats on today":
+                return Tool("daily_briefing", []);
+            case "this is my home network" or "this is home" or "this is my home" or "set this as my home network" or "save this network as home"
+                or "remember this network as home" or "this network is home" or "this is my wifi at home":
+                return Tool("set_home_network", []);
+            case "im home" or "i am home" or "im back home" or "i am back home":
+                return Tool("im_home", []);
+            case "am i home" or "am i at home" or "do you know if im home":
+                return Tool("presence_status", []);
+        }
+
+        if (RemindMe().Match(p) is { Success: true } remind && SplitReminder(remind.Groups["rest"].Value) is { } reminder)
+        {
+            return Tool("create_reminder", new JsonObject { ["text"] = reminder.What, ["when"] = reminder.When });
+        }
+
+        if (CancelReminder().Match(p) is { Success: true } cancel)
+        {
+            return Tool("cancel_reminder", new JsonObject { ["query"] = cancel.Groups["q"].Value });
+        }
+
+        if (Snooze().Match(p) is { Success: true } snooze)
+        {
+            var minutes = snooze.Groups["n"].Success ? ParseNumber(snooze.Groups["n"].Value) ?? 10 : 10;
+            return Tool("snooze_reminder", new JsonObject { ["minutes"] = minutes });
+        }
+
+        if (AddTask().Match(p) is { Success: true } add)
+        {
+            var text = new[] { "t", "t2", "t3" }.Select(g => add.Groups[g]).First(g => g.Success).Value;
+            return Tool("add_task", new JsonObject { ["text"] = text });
+        }
+
+        if (CompleteTask().Match(p) is { Success: true } done)
+        {
+            return Tool("complete_task", new JsonObject { ["query"] = done.Groups["q"].Success ? done.Groups["q"].Value : done.Groups["q2"].Value });
+        }
+
+        if (Recall().Match(p) is { Success: true } recall)
+        {
+            return Tool("recall", new JsonObject { ["query"] = recall.Groups["q"].Success ? recall.Groups["q"].Value : "" });
+        }
+
+        if (p is "what do you know about me" or "what do you remember about me")
+        {
+            return Tool("recall", new JsonObject { ["query"] = "" });
+        }
+
+        if (RememberThat().Match(p) is { Success: true } remember)
+        {
+            return Tool("remember", new JsonObject { ["text"] = remember.Groups["what"].Value });
+        }
+
+        if (Forget().Match(p) is { Success: true } forget && !forget.Groups["what"].Value.StartsWith("it", StringComparison.Ordinal))
+        {
+            return Tool("forget", new JsonObject { ["query"] = forget.Groups["what"].Value });
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// "call mum tomorrow at 7 pm" or "tomorrow at 7 pm to call mum": tries each place a time phrase could start and keeps
+    /// the first split whose time part the date parser understands; if none does, the last split, so the reminder tool
+    /// asks about the time instead of guessing.
+    /// </summary>
+    private static (string What, string When)? SplitReminder(string rest)
+    {
+        (string, string)? last = null;
+        var lead = Regex.Match(rest, @"^(?<when>.+?) to (?<what>.+)$");
+        if (lead.Success && TimeStart().Match(lead.Groups["when"].Value) is { Success: true, Index: 0 })
+        {
+            // "at 7 to call dad": even when the time needs a question, this split is the right one to ask about.
+            last = (lead.Groups["what"].Value, lead.Groups["when"].Value);
+            if (Aldren.Assistant.DateParser.Parse(lead.Groups["when"].Value, DateTime.Now) is not Aldren.Assistant.Unclear)
+            {
+                return last;
+            }
+        }
+
+        foreach (Match m in TimeStart().Matches(rest))
+        {
+            if (m.Index == 0)
+            {
+                continue;
+            }
+
+            var what = rest[..m.Index].Trim();
+            var when = rest[m.Index..].Trim();
+            if (what.StartsWith("to ", StringComparison.Ordinal))
+            {
+                what = what[3..];
+            }
+
+            last = (what, when);
+            if (Aldren.Assistant.DateParser.Parse(when, DateTime.Now) is not Aldren.Assistant.Unclear)
+            {
+                return last;
+            }
+        }
+
+        return last;
+    }
+
     /// <summary>"open this", "close that window", "start a timer"…: not an app name, so the model or a later phase decides.</summary>
     private static bool IsVague(string app)
     {
@@ -152,7 +299,8 @@ public static partial class FastPath
         var builder = new System.Text.StringBuilder(text.Length);
         foreach (var c in text.ToLowerInvariant())
         {
-            if (char.IsLetterOrDigit(c) || c == '%')
+            // ':' stays for clock times ("at 18:30"); '%' for volume levels.
+            if (char.IsLetterOrDigit(c) || c is '%' or ':')
             {
                 builder.Append(c);
             }

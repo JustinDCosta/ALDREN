@@ -26,6 +26,15 @@ public static class SettingsValidator
             errors.Add($"'{settings.Voice.PushToTalkHotkey}' isn't a valid push-to-talk hotkey.");
         }
 
+        if (settings.Presence is null)
+        {
+            errors.Add("Home & away settings are missing.");
+        }
+        else if (settings.Presence.GreetingAfterHours is < 1 or > 48)
+        {
+            errors.Add("The greeting interval must be 1–48 hours.");
+        }
+
         return errors;
     }
 }

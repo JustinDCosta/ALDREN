@@ -2,7 +2,7 @@
 
 A local-first, JARVIS-inspired personal AI assistant for Windows 11. You summon it by saying "ALDREN" (pronounced *al-drin*) or by typing. It talks naturally, operates your apps, windows, files and browser through a safety-checked automation layer, understands your screen, manages reminders and your Google calendar, researches online when asked, and helps you focus.
 
-> **Status:** Phases 0–2 are done. Phase 3 (voice: push-to-talk, speech recognition, spoken replies, an opt-in wake word) is implemented and awaiting its acceptance run. See [docs/STATUS.md](docs/STATUS.md).
+> **Status:** Phases 0–3 are done or in acceptance. Phase 4 (memory, reminders and tasks, the daily briefing, home/away with the greeting and away mute) is implemented; Google Calendar waits for your Google Cloud project. See [docs/STATUS.md](docs/STATUS.md).
 
 ## Design in one minute
 
@@ -23,6 +23,8 @@ A local-first, JARVIS-inspired personal AI assistant for Windows 11. You summon 
 | [docs/plans/phase-1.md](docs/plans/phase-1.md) | Phase 1 plan: foundation |
 | [docs/plans/phase-2.md](docs/plans/phase-2.md) | Phase 2 plan: Quick Brain and orchestrator |
 | [docs/plans/phase-3.md](docs/plans/phase-3.md) | Phase 3 plan: voice |
+| [docs/plans/phase-4.md](docs/plans/phase-4.md) | Phase 4 plan: personal assistant |
+| [docs/guides/google-oauth.md](docs/guides/google-oauth.md) | Creating the Google Cloud project for Calendar and Drive |
 | [docs/acceptance/phase-1.md](docs/acceptance/phase-1.md) | Phase 1 acceptance steps |
 | [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) | Pinned packages, licences and purposes |
 | [docs/benchmarks/phase0.md](docs/benchmarks/phase0.md) | Phase 0 results: measurements on this laptop and the decisions they led to |

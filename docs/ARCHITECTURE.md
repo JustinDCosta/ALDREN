@@ -371,6 +371,8 @@ Decision record: [ADR-0002](decisions/0002-winui3-ui.md). WinUI 3 (Windows App S
 ## 14. Personal assistant: reminders, tasks, memory, Google
 
 ### 14.1 Reminders and tasks
+> As built in Phase 4 ([ADR-0014](decisions/0014-phase4-without-downloads.md)): an English date parser and .NET time zones instead of Recognizers.Text, NodaTime and Ical.Net; daily/weekday/weekly recurrence; tray notifications, with missed reminders shown at the next start instead of an OS-level backup.
+
 - SQLite is the source of truth and the Core scheduler fires reminders. Reminders missed during sleep or a reboot are shown on return ("While you were away…").
 - The model extracts intent and slots; dates are resolved deterministically (Microsoft.Recognizers.Text, EN and FR) against the actual local time. NodaTime handles IANA time zones and DST; recurrence uses RFC 5545 RRULE (Ical.Net). One-time reminders are stored as UTC instants plus their time zone; recurring ones as local wall-clock time plus zone.
 - Ambiguous expressions ("at 7", "next Friday", "tomorrow" said after midnight) are read back with the resolved date and time before saving. Nothing is silently guessed.
@@ -378,6 +380,8 @@ Decision record: [ADR-0002](decisions/0002-winui3-ui.md). WinUI 3 (Windows App S
 - Tasks: lists, due dates, priorities and projects; a task page in the expanded window; create, update and complete by voice.
 
 ### 14.2 Memory
+> As built in Phase 4 (ADR-0014): keyword search (FTS5) plus recency; semantic search with sqlite-vec and EmbeddingGemma later.
+
 - Types: profile facts, preferences, projects, routines and procedures (for example window layouts), episodic conversation summaries.
 - Writes: "remember that…" saves immediately; memories ALDREN infers wait for your approval; passwords, keys, card numbers and ID numbers are blocked by detectors; health and financial details are stored only if you explicitly ask.
 - Retrieval: hybrid keyword (FTS5) + semantic (sqlite-vec with local EmbeddingGemma embeddings) + recency, within a small token budget.

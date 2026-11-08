@@ -69,6 +69,50 @@ public sealed class VoiceLoop(
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Something ALDREN says on its own (a reminder, the greeting). Spoken only when no conversation is under way and
+    /// speaking is allowed (not gaming, not over a fullscreen app, replies not switched off); otherwise the notification
+    /// that comes with it is enough. The Stop button, Escape and the hotkey stop it like any reply.
+    /// </summary>
+    public async Task<bool> AnnounceAsync(string text, CancellationToken ct)
+    {
+        if (_speaker is null || !settings.Current.Voice.SpeakReplies || residency.GamingMode || GamingDetector.FullscreenAppRunning())
+        {
+            return false;
+        }
+
+        if (!await _turnGate.WaitAsync(0, ct))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var speech = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            _speech = speech;
+            _mode = Mode.Speaking;
+            await ShowAsync(VoiceState.Speaking, text);
+            try
+            {
+                await _speaker.SpeakAsync(text, speech.Token);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                log.LogInformation("Announcement stopped");
+            }
+
+            return true;
+        }
+        finally
+        {
+            _speech = null;
+            _mode = Mode.Idle;
+            _endTurn = false;
+            await ShowAsync(VoiceState.Idle, "");
+            _turnGate.Release();
+        }
+    }
+
     /// <summary>The Stop button or Escape: silence now, stop writing the reply, and end the turn (no follow-up).</summary>
     public Task StopSpeakingAsync()
     {

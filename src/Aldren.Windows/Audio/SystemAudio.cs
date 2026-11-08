@@ -83,6 +83,65 @@ public static class SystemAudio
     private interface IMMDevice
     {
         [PreserveSig] int Activate(ref Guid iid, int clsCtx, nint activationParams, [MarshalAs(UnmanagedType.IUnknown)] out object endpoint);
+        [PreserveSig] int OpenPropertyStore(int access, out IPropertyStore store);
+    }
+
+    [ComImport]
+    [Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IPropertyStore
+    {
+        [PreserveSig] int GetCount(out uint count);
+        [PreserveSig] int GetAt(uint index, out PropertyKey key);
+        [PreserveSig] int GetValue(ref PropertyKey key, out PropVariant value);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PropertyKey(Guid formatId, int propertyId)
+    {
+        public Guid FormatId = formatId;
+        public int PropertyId = propertyId;
+    }
+
+    /// <summary>Only the VT_UI4 case is read (the endpoint form factor); nothing to free for it.</summary>
+    [StructLayout(LayoutKind.Explicit, Size = 24)]
+    private struct PropVariant
+    {
+        [FieldOffset(0)] public ushort VarType;
+        [FieldOffset(8)] public uint UInt;
+    }
+
+    /// <summary>True when the default output is headphones or a headset (PKEY_AudioEndpoint_FormFactor 3 or 5).</summary>
+    public static bool OutputIsHeadphones()
+    {
+        var enumerator = (IMMDeviceEnumerator)new MMDeviceEnumerator();
+        IMMDevice? device = null;
+        IPropertyStore? store = null;
+        try
+        {
+            if (enumerator.GetDefaultAudioEndpoint(0 /* eRender */, 1 /* eMultimedia */, out device) != 0
+                || device.OpenPropertyStore(0 /* STGM_READ */, out store) != 0)
+            {
+                return false;
+            }
+
+            var key = new PropertyKey(new Guid("1da5d803-d492-4edd-8c23-e0c0ffee7f0e"), 0);
+            return store.GetValue(ref key, out var value) == 0 && value.VarType == 19 /* VT_UI4 */ && value.UInt is 3 or 5;
+        }
+        finally
+        {
+            if (store is not null)
+            {
+                Marshal.ReleaseComObject(store);
+            }
+
+            if (device is not null)
+            {
+                Marshal.ReleaseComObject(device);
+            }
+
+            Marshal.ReleaseComObject(enumerator);
+        }
     }
 
     [ComImport]

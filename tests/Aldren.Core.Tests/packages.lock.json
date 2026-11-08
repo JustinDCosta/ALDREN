@@ -667,6 +667,13 @@
           "xunit.extensibility.core": "[2.9.3]"
         }
       },
+      "aldren.assistant": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Data.Sqlite": "[10.0.14, )",
+          "Microsoft.Extensions.Hosting": "[10.0.14, )"
+        }
+      },
       "aldren.common": {
         "type": "Project",
         "dependencies": {
@@ -685,7 +692,10 @@
       "aldren.core": {
         "type": "Project",
         "dependencies": {
+          "Aldren.Assistant": "[1.0.0, )",
           "Aldren.Inference": "[1.0.0, )",
+          "Aldren.Memory": "[1.0.0, )",
+          "Aldren.Presence": "[1.0.0, )",
           "Aldren.Security": "[1.0.0, )",
           "Aldren.Voice": "[1.0.0, )",
           "Aldren.Windows": "[1.0.0, )",
@@ -696,6 +706,19 @@
       "aldren.inference": {
         "type": "Project",
         "dependencies": {
+          "Microsoft.Extensions.Hosting": "[10.0.14, )"
+        }
+      },
+      "aldren.memory": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Data.Sqlite": "[10.0.14, )"
+        }
+      },
+      "aldren.presence": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Data.Sqlite": "[10.0.14, )",
           "Microsoft.Extensions.Hosting": "[10.0.14, )"
         }
       },

@@ -501,6 +501,13 @@
         "resolved": "9.0.0",
         "contentHash": "hyJB4UlpAi19Xr9AXzu2NuagKC4lPfHObNMEAA0HmqFz2rX7wKgzeYzO/jM/eBHDhnUGFFEjk5cOoJaxqg5J4A=="
       },
+      "aldren.assistant": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Data.Sqlite": "[10.0.14, )",
+          "Microsoft.Extensions.Hosting": "[10.0.14, )"
+        }
+      },
       "aldren.common": {
         "type": "Project",
         "dependencies": {
@@ -519,6 +526,19 @@
       "aldren.inference": {
         "type": "Project",
         "dependencies": {
+          "Microsoft.Extensions.Hosting": "[10.0.14, )"
+        }
+      },
+      "aldren.memory": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Data.Sqlite": "[10.0.14, )"
+        }
+      },
+      "aldren.presence": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Data.Sqlite": "[10.0.14, )",
           "Microsoft.Extensions.Hosting": "[10.0.14, )"
         }
       },

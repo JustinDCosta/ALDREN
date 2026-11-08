@@ -20,6 +20,9 @@
     <ProjectReference Include="..\Aldren.Inference\Aldren.Inference.csproj" />
     <ProjectReference Include="..\Aldren.Windows\Aldren.Windows.csproj" />
     <ProjectReference Include="..\Aldren.Voice\Aldren.Voice.csproj" />
+    <ProjectReference Include="..\Aldren.Memory\Aldren.Memory.csproj" />
+    <ProjectReference Include="..\Aldren.Assistant\Aldren.Assistant.csproj" />
+    <ProjectReference Include="..\Aldren.Presence\Aldren.Presence.csproj" />
   </ItemGroup>
 
 </Project>

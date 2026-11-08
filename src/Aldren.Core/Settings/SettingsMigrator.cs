@@ -14,6 +14,12 @@ public sealed class SettingsMigrator(IReadOnlyDictionary<int, Func<JsonObject, J
             document["voice"] ??= new JsonObject();
             return document;
         },
+        // 2 → 3: the Home & away section (Phase 4), with its defaults.
+        [2] = document =>
+        {
+            document["presence"] ??= new JsonObject();
+            return document;
+        },
     });
 
     public int CurrentVersion => AldrenSettings.CurrentSchemaVersion;
