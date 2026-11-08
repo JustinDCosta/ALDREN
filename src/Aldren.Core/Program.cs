@@ -1,13 +1,16 @@
 using Aldren.Common;
 using Aldren.Common.Logging;
 using Aldren.Core;
-using Aldren.Core.Commands;
+using Aldren.Core.Assistant;
+using Aldren.Core.Orchestration;
 using Aldren.Core.Ipc;
 using Aldren.Core.Maintenance;
 using Aldren.Core.Settings;
 using Aldren.Core.Startup;
 using Aldren.Core.Supervision;
 using Aldren.Core.Tools;
+using Aldren.Inference;
+using Aldren.Windows.Apps;
 using Aldren.Security.Audit;
 using Aldren.Security.Gateway;
 using Aldren.Security.Permissions;
@@ -60,20 +63,41 @@ try
     builder.Services.AddSingleton<IRegistryValues, CurrentUserRegistry>();
     builder.Services.AddSingleton<StartupEntry>();
 
-    builder.Services.AddSingleton(PermissionCatalog.Phase1);
+    builder.Services.AddSingleton(PermissionCatalog.Phase2);
     builder.Services.AddSingleton<IPermissionStore>(sp => new PermissionStore(paths.PermissionsFile, sp.GetRequiredService<PermissionCatalog>()));
     builder.Services.AddSingleton<IAuditLog>(new SqliteAuditLog(paths.DatabasePath));
     builder.Services.AddSingleton<ITool, GetTimeTool>();
     builder.Services.AddSingleton<ITool, DiagnosticsConfirmTool>();
+    builder.Services.AddSingleton<ITool, GetDateTool>();
+    builder.Services.AddSingleton<ITool, CalculateTool>();
+    builder.Services.AddSingleton<ITool, StartTimerTool>();
+    builder.Services.AddSingleton<ITool, LaunchAppTool>();
+    builder.Services.AddSingleton<ITool, FocusAppTool>();
+    builder.Services.AddSingleton<ITool, CloseAppTool>();
+    builder.Services.AddSingleton<ITool, SetVolumeTool>();
+    builder.Services.AddSingleton<ITool, ChangeVolumeTool>();
+    builder.Services.AddSingleton<ITool, MuteTool>();
+    builder.Services.AddSingleton<ITool, MediaControlTool>();
+    builder.Services.AddSingleton<ITool, DelegateToActionTool>();
+    builder.Services.AddSingleton<ITool, RequestResearchTool>();
+
+    builder.Services.AddSingleton(new InferenceOptions());
+    builder.Services.AddSingleton<InferenceHost>();
+    builder.Services.AddSingleton<IInferenceHost>(sp => sp.GetRequiredService<InferenceHost>());
+    builder.Services.AddSingleton<ResidencyManager>();
+    builder.Services.AddSingleton<AppIndex>();
+    builder.Services.AddSingleton<TimerService>();
+    builder.Services.AddSingleton<ICloudFallback, NoCloudFallback>();
     builder.Services.AddSingleton<ToolRegistry>();
     builder.Services.AddSingleton<IToolPolicy, TierPolicy>();
     builder.Services.AddSingleton<IToolPolicy, TaintPolicy>();
     builder.Services.AddSingleton<ToolGateway>();
-    builder.Services.AddSingleton<PlaceholderCommands>();
+    builder.Services.AddSingleton<Orchestrator>();
 
     builder.Services.AddHostedService<CoreRpcServer>();
     builder.Services.AddHostedService(sp => sp.GetRequiredService<AppSupervisor>());
     builder.Services.AddHostedService<AuditRetentionService>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<ResidencyManager>());
 
     using var host = builder.Build();
     var supervisor = host.Services.GetRequiredService<AppSupervisor>();

@@ -1,6 +1,6 @@
 using System.Reflection;
 using Aldren.Contracts;
-using Aldren.Core.Commands;
+using Aldren.Core.Orchestration;
 using Aldren.Core.Settings;
 using Aldren.Core.Startup;
 using Aldren.Core.Supervision;
@@ -14,7 +14,7 @@ namespace Aldren.Core;
 
 /// <summary>What the App reaches over the pipe.</summary>
 public sealed class CoreService(
-    PlaceholderCommands commands,
+    Orchestrator orchestrator,
     SettingsStore settings,
     IPermissionStore permissions,
     IAuditLog audit,
@@ -34,7 +34,7 @@ public sealed class CoreService(
         Task.FromResult(new CoreStatus(Version, Environment.ProcessId, _startedAt, startup.GetState(ExecutablePath)));
 
     public Task<string> SubmitTextAsync(string text, CancellationToken cancellationToken) =>
-        commands.HandleAsync(text, cancellationToken);
+        orchestrator.HandleAsync(text, cancellationToken);
 
     public Task<AldrenSettings> GetSettingsAsync(CancellationToken cancellationToken) => Task.FromResult(settings.Current);
 

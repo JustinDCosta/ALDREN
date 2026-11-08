@@ -567,9 +567,17 @@
       "aldren.core": {
         "type": "Project",
         "dependencies": {
+          "Aldren.Inference": "[1.0.0, )",
           "Aldren.Security": "[1.0.0, )",
+          "Aldren.Windows": "[1.0.0, )",
           "Microsoft.Extensions.Hosting": "[10.0.14, )",
           "Microsoft.Win32.SystemEvents": "[10.0.14, )"
+        }
+      },
+      "aldren.inference": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Extensions.Hosting": "[10.0.14, )"
         }
       },
       "aldren.security": {
@@ -579,6 +587,12 @@
           "Aldren.Contracts": "[1.0.0, )",
           "Microsoft.Data.Sqlite": "[10.0.14, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.14, )"
+        }
+      },
+      "aldren.windows": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Extensions.Hosting": "[10.0.14, )"
         }
       }
     }

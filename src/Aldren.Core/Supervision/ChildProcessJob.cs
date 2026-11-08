@@ -26,7 +26,7 @@ public sealed unsafe class ChildProcessJob : IDisposable
         var limits = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();
         limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
         if (!PInvoke.SetInformationJobObject(
-                (Windows.Win32.Foundation.HANDLE)_job.DangerousGetHandle(), JOBOBJECTINFOCLASS.JobObjectExtendedLimitInformation, &limits, (uint)sizeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION)))
+                (global::Windows.Win32.Foundation.HANDLE)_job.DangerousGetHandle(), JOBOBJECTINFOCLASS.JobObjectExtendedLimitInformation, &limits, (uint)sizeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION)))
         {
             var error = Marshal.GetLastWin32Error();
             _job.Dispose();

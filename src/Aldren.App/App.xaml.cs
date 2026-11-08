@@ -103,7 +103,7 @@ public partial class ShellApp : Application
         Hotkeys.Apply(AldrenSettings.Default.General.Hotkey);
 
         _watchdog = new CoreWatchdog(new CoreWatchdogPolicy(new RestartBackoff(TimeProvider.System)), _loggers.CreateLogger<CoreWatchdog>());
-        _client = new CoreClient(new AppCallbacks(ConfirmAsync), _watchdog, _loggers.CreateLogger<CoreClient>());
+        _client = new CoreClient(new AppCallbacks(ConfirmAsync, (title, message) => _ui.TryEnqueue(() => _tray.ShowNotification(title, message))), _watchdog, _loggers.CreateLogger<CoreClient>());
         _client.Connected += core => _ui.TryEnqueue(() => _ = OnConnectedAsync(core));
         _client.Disconnected += () => _ui.TryEnqueue(() => _tray.StartWithWindowsAvailable = false);
         _client.Start();

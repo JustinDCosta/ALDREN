@@ -64,6 +64,17 @@ internal sealed unsafe class TrayIcon : IDisposable
         PInvoke.Shell_NotifyIcon(NOTIFY_ICON_MESSAGE.NIM_SETVERSION, &data);
     }
 
+    /// <summary>A Windows notification from the tray icon (finished timers, for now).</summary>
+    public void ShowNotification(string title, string message)
+    {
+        var data = NewData();
+        data.uFlags = NOTIFY_ICON_DATA_FLAGS.NIF_INFO;
+        data.szInfoTitle = title.Length > 63 ? title[..63] : title;
+        data.szInfo = message.Length > 255 ? message[..255] : message;
+        data.dwInfoFlags = NOTIFY_ICON_INFOTIP_FLAGS.NIIF_INFO;
+        PInvoke.Shell_NotifyIcon(NOTIFY_ICON_MESSAGE.NIM_MODIFY, &data);
+    }
+
     private NOTIFYICONDATAW NewData() => new()
     {
         cbSize = (uint)sizeof(NOTIFYICONDATAW),

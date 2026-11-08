@@ -17,6 +17,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Aldren.Security\Aldren.Security.csproj" />
+    <ProjectReference Include="..\Aldren.Inference\Aldren.Inference.csproj" />
+    <ProjectReference Include="..\Aldren.Windows\Aldren.Windows.csproj" />
   </ItemGroup>
 
 </Project>
