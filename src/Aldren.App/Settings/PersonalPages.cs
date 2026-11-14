@@ -5,15 +5,23 @@ using Microsoft.UI.Xaml.Controls;
 namespace Aldren.App.Settings;
 
 /// <summary>The memory inspector: everything ALDREN remembers, searchable, each deletable.</summary>
-public sealed class MemoryPage() : SettingsPage("Memory")
+public sealed class MemoryPage() : SettingsPage(
+    "Memory",
+    "What you asked ALDREN to remember. It stays on this PC and is never sent anywhere. Say \"remember that…\" to add and \"forget…\" to remove, or delete entries here.")
 {
-    private readonly StackPanel _list = new() { Spacing = 6 };
+    private readonly StackPanel _list = new() { Spacing = 4 };
 
     protected override async Task LoadAsync(IAldrenCore core)
     {
-        Paragraph("What you asked ALDREN to remember. It stays on this PC and is never sent anywhere. Say \"remember that…\" to add, \"forget…\" to remove, or delete entries here.");
-        var search = Named(new AutoSuggestBox { PlaceholderText = "Search memories", QueryIcon = new SymbolIcon(Symbol.Find), Width = 360, HorizontalAlignment = HorizontalAlignment.Left }, "Search memories");
+        var search = Named(new AutoSuggestBox { PlaceholderText = "Search memories", QueryIcon = new SymbolIcon(Symbol.Find), MaxWidth = 420, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 8) }, "Search memories");
         search.QuerySubmitted += async (_, e) => await FillAsync(core, e.QueryText);
+        search.TextChanged += async (_, e) =>
+        {
+            if (e.Reason == AutoSuggestionBoxTextChangeReason.UserInput && search.Text.Length == 0)
+            {
+                await FillAsync(core, null);
+            }
+        };
         Body.Children.Add(search);
         Body.Children.Add(_list);
         await FillAsync(core, null);
@@ -25,7 +33,7 @@ public sealed class MemoryPage() : SettingsPage("Memory")
         var items = await core.GetMemoriesAsync(query, CancellationToken.None);
         if (items.Count == 0)
         {
-            _list.Children.Add(new TextBlock { Text = string.IsNullOrWhiteSpace(query) ? "Nothing remembered yet." : "No memory matches that." });
+            _list.Children.Add(Secondary(string.IsNullOrWhiteSpace(query) ? "Nothing remembered yet." : "No memory matches that.", new Thickness(2, 8, 0, 0)));
             return;
         }
 
@@ -34,33 +42,35 @@ public sealed class MemoryPage() : SettingsPage("Memory")
             var row = new Grid { ColumnSpacing = 12 };
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            row.Children.Add(new TextBlock
-            {
-                Text = $"{item.Text}   ({(item.Kind == "profile" ? "about you, " : "")}{item.Created.ToLocalTime():d MMM yyyy})",
-                TextWrapping = TextWrapping.Wrap,
-                VerticalAlignment = VerticalAlignment.Center,
-            });
-            var delete = Named(new Button { Content = "Delete" }, $"Delete memory: {item.Text}");
+            var text = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
+            text.Children.Add(new TextBlock { Text = item.Text, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true });
+            var meta = Secondary($"{(item.Kind == "profile" ? "About you  ·  " : "")}{item.Created.ToLocalTime():d MMM yyyy}", default);
+            meta.Style = (Style)Application.Current.Resources["CaptionTextBlockStyle"];
+            text.Children.Add(meta);
+            row.Children.Add(text);
+            var delete = Named(new Button { Content = new FontIcon { Glyph = "", FontSize = 14 }, VerticalAlignment = VerticalAlignment.Center }, $"Delete memory: {item.Text}");
+            ToolTipService.SetToolTip(delete, "Delete this memory");
             Grid.SetColumn(delete, 1);
+            row.Children.Add(delete);
+            var card = new Border { Style = (Style)Application.Current.Resources["AldrenCardStyle"], Child = row };
             delete.Click += async (_, _) =>
             {
                 await core.DeleteMemoryAsync(item.Id, CancellationToken.None);
-                _list.Children.Remove(row);
+                _list.Children.Remove(card);
             };
-            row.Children.Add(delete);
-            _list.Children.Add(row);
+            _list.Children.Add(card);
         }
     }
 }
 
 /// <summary>Upcoming reminders (cancel) and open tasks (done).</summary>
-public sealed class RemindersPage() : SettingsPage("Reminders & tasks")
+public sealed class RemindersPage() : SettingsPage(
+    "Reminders & tasks",
+    "Say \"remind me to… at…\", \"add… to my tasks\" or \"what's on my to-do list\". Reminders survive restarts; one missed while ALDREN was off shows when it starts.")
 {
     protected override async Task LoadAsync(IAldrenCore core)
     {
-        Paragraph("Say \"remind me to… at…\", \"add… to my tasks\" or \"what's on my to-do list\". Reminders survive restarts; one missed while ALDREN was off shows when it starts.");
-
-        Body.Children.Add(new TextBlock { Text = "Reminders", Style = (Style)Application.Current.Resources["SubtitleTextBlockStyle"] });
+        Header("Reminders");
         var reminders = await core.GetRemindersAsync(CancellationToken.None);
         if (reminders.Count == 0)
         {
@@ -69,10 +79,10 @@ public sealed class RemindersPage() : SettingsPage("Reminders & tasks")
 
         foreach (var r in reminders)
         {
-            Body.Children.Add(Row($"{r.Text} — {r.When}", "Cancel", $"Cancel reminder: {r.Text}", () => core.CancelReminderAsync(r.Id, CancellationToken.None)));
+            Line(r.Text, r.When, "Cancel", $"Cancel reminder: {r.Text}", "", () => core.CancelReminderAsync(r.Id, CancellationToken.None));
         }
 
-        Body.Children.Add(new TextBlock { Text = "Tasks", Style = (Style)Application.Current.Resources["SubtitleTextBlockStyle"], Margin = new Thickness(0, 12, 0, 0) });
+        Header("Tasks");
         var tasks = await core.GetTasksAsync(CancellationToken.None);
         if (tasks.Count == 0)
         {
@@ -81,25 +91,19 @@ public sealed class RemindersPage() : SettingsPage("Reminders & tasks")
 
         foreach (var t in tasks)
         {
-            Body.Children.Add(Row(t.Text, "Done", $"Mark task done: {t.Text}", () => core.CompleteTaskAsync(t.Id, CancellationToken.None)));
+            Line(t.Text, null, "Done", $"Mark task done: {t.Text}", "", () => core.CompleteTaskAsync(t.Id, CancellationToken.None));
         }
     }
 
-    private Grid Row(string text, string action, string name, Func<Task> act)
+    private void Line(string text, string? detail, string action, string name, string glyph, Func<Task> act)
     {
-        var row = new Grid { ColumnSpacing = 12 };
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        row.Children.Add(new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center });
         var button = Named(new Button { Content = action }, name);
-        Grid.SetColumn(button, 1);
+        var card = Card(text, detail, button, glyph);
         button.Click += async (_, _) =>
         {
             await act();
-            Body.Children.Remove(row);
+            Body.Children.Remove(card.Root);
         };
-        row.Children.Add(button);
-        return row;
     }
 }
 
@@ -112,63 +116,71 @@ public sealed class HomeAwayPage() : SettingsPage("Home & away")
         var p = settings.Presence;
         var info = await core.GetPresenceAsync(CancellationToken.None);
 
-        var status = Paragraph(Describe(info));
-        Paragraph("ALDREN recognises home by the network you're on (a hashed network ID and router address, kept on this PC; VPNs such as Tailscale are ignored).");
-
-        var result = new TextBlock { TextWrapping = TextWrapping.Wrap };
         var setHome = Named(new Button { Content = "This network is home" }, "This network is home");
-        setHome.Click += async (_, _) =>
+        var forget = Named(new Button { Content = "Forget" }, "Forget home networks");
+        var status = Card(Title(info), Detail(info), Row(setHome, forget), "");
+        Paragraph("ALDREN recognises home by the network you're on: a hashed network ID and router address, kept on this PC. VPNs such as Tailscale are ignored.");
+
+        async Task RefreshAsync(string? result)
         {
-            result.Text = await core.SetHomeNetworkAsync(CancellationToken.None);
-            status.Text = Describe(await core.GetPresenceAsync(CancellationToken.None));
-        };
-        var forget = Named(new Button { Content = "Forget home networks" }, "Forget home networks");
+            var now = await core.GetPresenceAsync(CancellationToken.None);
+            status.Title.Text = Title(now);
+            status.Describe(result is null ? Detail(now) : $"{result} {Detail(now)}");
+        }
+
+        setHome.Click += async (_, _) => await RefreshAsync(await core.SetHomeNetworkAsync(CancellationToken.None));
         forget.Click += async (_, _) =>
         {
             await core.ForgetHomeNetworksAsync(CancellationToken.None);
-            result.Text = "Home networks forgotten.";
-            status.Text = Describe(await core.GetPresenceAsync(CancellationToken.None));
+            await RefreshAsync("Home networks forgotten.");
         };
-        Body.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { setHome, forget } });
-        Body.Children.Add(result);
 
-        var greeting = Named(new ToggleSwitch { Header = "Greet me when I'm back home (\"Welcome back, boss.\")", IsOn = p.Greeting }, "Greeting");
-        var briefing = Named(new ToggleSwitch { Header = "Add the daily briefing to the first greeting of the day", IsOn = p.BriefingWithGreeting }, "Briefing with greeting");
-        var hours = Named(new NumberBox { Header = "Only after at least this many hours", Value = p.GreetingAfterHours, Minimum = 1, Maximum = 48, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact, Width = 260, HorizontalAlignment = HorizontalAlignment.Left }, "Greeting interval in hours");
-        var mute = Named(new ToggleSwitch { Header = "Mute the PC when I'm away from home", IsOn = p.AwayMute }, "Away mute");
-        var headphones = Named(new ToggleSwitch { Header = "Don't mute when the sound goes to headphones", IsOn = p.AwayMuteSkipHeadphones }, "Skip headphones");
-        foreach (var control in new UIElement[] { greeting, briefing, hours, mute, headphones })
+        Header("Coming home");
+        var greeting = Switch(p.Greeting, "Greeting");
+        Card("Greet me when I'm back", "\"Welcome back, boss.\" at sign-in or unlock, at home.", greeting, "");
+        SaveOnToggle(greeting, core, (s, on) => s with { Presence = s.Presence with { Greeting = on } });
+
+        var briefing = Switch(p.BriefingWithGreeting, "Briefing with greeting");
+        Card("Add the daily briefing", "With the first greeting of the day: calendar, reminders and tasks.", briefing);
+        SaveOnToggle(briefing, core, (s, on) => s with { Presence = s.Presence with { BriefingWithGreeting = on } });
+
+        var hours = Named(new NumberBox
         {
-            Body.Children.Add(control);
-        }
-
-        Paragraph("Away mute restores the sound back home only if ALDREN did the muting and you haven't changed the volume since. Nothing happens until a home network is saved.");
-
-        var saveResult = new TextBlock { TextWrapping = TextWrapping.Wrap };
-        var save = Named(new Button { Content = "Save" }, "Save home and away settings");
-        save.Click += async (_, _) =>
+            Value = p.GreetingAfterHours,
+            Minimum = 1,
+            Maximum = 48,
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact,
+            Width = 130,
+        }, "Greeting interval in hours");
+        Card("Hours between greetings", "Only greet after at least this long since the last one.", hours);
+        hours.ValueChanged += async (_, e) =>
         {
-            var updated = settings with
+            if (!double.IsNaN(e.NewValue))
             {
-                Presence = new PresenceSettings(greeting.IsOn, briefing.IsOn, double.IsNaN(hours.Value) ? 4 : (int)hours.Value, mute.IsOn, headphones.IsOn),
-            };
-            var saved = await core.UpdateSettingsAsync(updated, CancellationToken.None);
-            saveResult.Text = saved.Saved ? "Saved." : string.Join(" ", saved.Errors);
-            if (saved.Saved)
-            {
-                settings = updated;
+                await SaveAsync(core, s => s with { Presence = s.Presence with { GreetingAfterHours = (int)e.NewValue } });
             }
         };
-        Body.Children.Add(save);
-        Body.Children.Add(saveResult);
+
+        Header("Away from home");
+        var mute = Switch(p.AwayMute, "Away mute");
+        Card("Mute the PC when I'm away", "Restored back home only if ALDREN did the muting and you haven't changed the volume since. Nothing happens until a home network is saved.", mute, "");
+        SaveOnToggle(mute, core, (s, on) => s with { Presence = s.Presence with { AwayMute = on } });
+
+        var headphones = Switch(p.AwayMuteSkipHeadphones, "Skip headphones");
+        Card("Leave headphones alone", "Don't mute while the sound goes to headphones.", headphones);
+        SaveOnToggle(headphones, core, (s, on) => s with { Presence = s.Presence with { AwayMuteSkipHeadphones = on } });
     }
 
-    private static string Describe(PresenceInfo info) => info.HomeNetworks == 0
-        ? "No home network saved yet. While you're at home, click \"This network is home\" (or say \"this is my home network\")."
+    private static string Title(PresenceInfo info) => info.HomeNetworks == 0
+        ? "No home network saved yet"
         : info.State switch
         {
-            "Home" => info.Override ? "You're home (you said so)." : "You're home.",
-            "Away" => "You're away from home.",
-            _ => "Can't tell right now (no identifiable network).",
-        } + $" {info.HomeNetworks} home network fingerprint(s) saved.";
+            "Home" => info.Override ? "You're home (you said so)" : "You're home",
+            "Away" => "You're away from home",
+            _ => "Can't tell right now",
+        };
+
+    private static string Detail(PresenceInfo info) => info.HomeNetworks == 0
+        ? "While you're at home, click \"This network is home\" (or say \"this is my home network\")."
+        : $"{info.HomeNetworks} home network{(info.HomeNetworks == 1 ? "" : "s")} saved." + (info.State is "Home" or "Away" ? "" : " No identifiable network at the moment.");
 }

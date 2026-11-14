@@ -83,6 +83,9 @@ Logs are redacted, and secrets never enter prompts.
 - llama-server listens on 127.0.0.1 on a random port and requires a random API key (otherwise any web page could use it).
 - Child processes run in a Job Object, so they never outlive ALDREN.
 - ALDREN's windows are excluded from screen capture by default (a toggle allows showing them on stream).
+- Browser bridge (Phase 7): Chrome or Edge starts `Aldren.BrowserHost.exe` through native messaging only for the extension ID fixed by the Companion's key (`allowed_origins`); the host talks to Core on a pipe restricted to your account and accepts only a fixed command list with 1 MB frames. The two HKCU `NativeMessagingHosts` keys are written only when you click Connect in Settings > Browser, and Disconnect removes them. Page content comes back as untrusted data; password and card fields are never read or filled, checked in the page script and again in Core.
+- Google (Phase 7): your own OAuth client; the client secret and the refresh token live in Credential Manager (no token file); Disconnect revokes the token at Google and deletes it.
+- Dictation (Phase 9) types with Unicode key events into the focused field only through the gateway tool `type_text`: never in gaming mode, never into password fields, never text that looks like a secret.
 
 ## FreeLLMAPI hardening (applied by ALDREN at launch)
 - 127.0.0.1 and a random port only; `ALLOWED_HOSTS=localhost` turns on the DNS-rebinding guard.

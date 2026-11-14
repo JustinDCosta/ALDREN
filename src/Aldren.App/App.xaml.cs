@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Reflection;
 using Aldren.App.Expanded;
@@ -13,7 +14,6 @@ using Aldren.Contracts;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
 using Serilog;
 using Serilog.Extensions.Logging;
 
@@ -22,6 +22,8 @@ namespace Aldren.App;
 /// <summary>Starts hidden: only the tray icon shows until you open a window.</summary>
 public partial class ShellApp : Application
 {
+    private const int MaxConversationEntries = 400;
+
     public static string Version { get; } =
         typeof(ShellApp).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
 
@@ -37,6 +39,12 @@ public partial class ShellApp : Application
     private CoreClient _client = null!;
     private ExpandedWindow? _expanded;
     private SettingsWindow? _settings;
+    private StopKey _stopKey = null!;
+    private ConversationEntry? _voiceReply;
+    private long _trayRefreshed;
+
+    // Typed requests waiting for their reply, oldest first: Core answers them in order, so progress belongs to the first.
+    private readonly List<ConversationEntry> _pendingReplies = [];
 
     public ShellApp()
     {
@@ -57,8 +65,8 @@ public partial class ShellApp : Application
 
     internal HotkeyService PushToTalk { get; private set; } = null!;
 
-    /// <summary>This session's conversation, typed and spoken, shown in the conversation window. In memory only (memory is Phase 4).</summary>
-    public System.Collections.ObjectModel.ObservableCollection<string> Conversation { get; } = [];
+    /// <summary>This session's conversation, typed and spoken, shown in the conversation window. In memory only.</summary>
+    public ObservableCollection<ConversationEntry> Conversation { get; } = [];
 
     /// <summary>True from the first sound of a spoken reply until it ends or is stopped.</summary>
     public bool IsSpeaking { get; private set; }
@@ -66,8 +74,76 @@ public partial class ShellApp : Application
     /// <summary>Raised on the UI thread when <see cref="IsSpeaking"/> changes.</summary>
     public event Action<bool>? SpeakingChanged;
 
-    private StopKey _stopKey = null!;
-    private int? _replyEntry;
+    /// <summary>
+    /// A typed request, from the island or the conversation window: both turns go into the conversation, the reply fills
+    /// in while ALDREN writes it, and the finished reply is returned.
+    /// </summary>
+    public async Task<string> AskAsync(string text)
+    {
+        Add(new ConversationEntry(fromUser: true, text));
+        var entry = new ConversationEntry(fromUser: false, "", pending: true);
+        Add(entry);
+        _pendingReplies.Add(entry);
+        string reply;
+        try
+        {
+            reply = Core is { } core
+                ? await core.SubmitTextAsync(text, CancellationToken.None)
+                : "I'm not connected to ALDREN's background service right now. It restarts on its own; try again in a moment.";
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning("A typed request failed: {Message}", ex.Message);
+            reply = "Something went wrong: " + ex.Message;
+        }
+        finally
+        {
+            _pendingReplies.Remove(entry);
+        }
+
+        entry.Text = reply;
+        entry.Pending = false;
+        return reply;
+    }
+
+    /// <summary>"New conversation": clears what the window shows and what ALDREN carries over from earlier turns.</summary>
+    public async Task NewConversationAsync()
+    {
+        Conversation.Clear();
+        _pendingReplies.Clear();
+        _voiceReply = null;
+        if (Core is { } core)
+        {
+            try
+            {
+                await core.NewConversationAsync(CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning("Couldn't start a new conversation in Core: {Message}", ex.Message);
+            }
+        }
+    }
+
+    private void Add(ConversationEntry entry)
+    {
+        Conversation.Add(entry);
+        while (Conversation.Count > MaxConversationEntries)
+        {
+            Conversation.RemoveAt(0);
+        }
+    }
+
+    /// <summary>The reply to the typed request in flight, as far as Core has it.</summary>
+    private void OnReplyProgress(string text)
+    {
+        if (_pendingReplies.Count > 0)
+        {
+            _pendingReplies[0].Text = text;
+        }
+
+        Island.ShowTypedProgress(text);
+    }
 
     /// <summary>The Stop buttons and Escape: ALDREN goes quiet at once and the voice turn ends.</summary>
     public void StopSpeaking()
@@ -83,21 +159,25 @@ public partial class ShellApp : Application
     {
         if (state == VoiceState.Thinking)
         {
-            Conversation.Add("You (voice): " + text);
-            _replyEntry = null;
+            Add(new ConversationEntry(fromUser: true, text, voice: true));
+            _voiceReply = null;
         }
         else if (state == VoiceState.Speaking && text.Length > 0)
         {
             // The reply arrives twice: what was written when the first sound played, then all of it. One entry.
-            if (_replyEntry is int index && index < Conversation.Count)
+            if (_voiceReply is { } entry && Conversation.Contains(entry))
             {
-                Conversation[index] = "ALDREN: " + text;
+                entry.Text = text;
             }
             else
             {
-                Conversation.Add("ALDREN: " + text);
-                _replyEntry = Conversation.Count - 1;
+                _voiceReply = new ConversationEntry(fromUser: false, text, voice: true);
+                Add(_voiceReply);
             }
+        }
+        else if (state == VoiceState.Idle)
+        {
+            _voiceReply = null;
         }
 
         var speaking = state == VoiceState.Speaking;
@@ -124,12 +204,13 @@ public partial class ShellApp : Application
         }
     }
 
-    /// <summary>Applies settings the App acts on itself: the hotkey and whether the island shows on stream.</summary>
+    /// <summary>Applies settings the App acts on itself: the hotkeys and whether the island shows on stream.</summary>
     public void ApplySettings(AldrenSettings settings)
     {
         Hotkeys.Apply(settings.General.Hotkey);
         PushToTalk.Apply(settings.Voice.PushToTalkHotkey);
         Island.SetShowOnStream(settings.General.ShowOnStream);
+        _tray.AskHint = Hotkeys.Active?.ToString();
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
@@ -141,7 +222,12 @@ public partial class ShellApp : Application
         _loggers = new SerilogLoggerFactory(Serilog.Log.Logger);
         _log = _loggers.CreateLogger("Aldren.App");
         _log.LogInformation("App starting (process {ProcessId})", Environment.ProcessId);
-        UnhandledException += (_, e) => _log.LogError(e.Exception, "Unhandled UI exception");
+        UnhandledException += (_, e) =>
+        {
+            // A failed handler must not take the tray, the island and the hotkeys down with it.
+            _log.LogError(e.Exception, "Unhandled UI exception");
+            e.Handled = true;
+        };
 
         _host = new HostWindow();
         _host.Message += OnHostMessage;
@@ -149,17 +235,17 @@ public partial class ShellApp : Application
         _tray = new TrayIcon(_host, IconPath);
         // Leave the window procedure before touching WinUI.
         _tray.Command += command => _ui.TryEnqueue(() => RunLogged(() => OnTrayCommand(command), $"tray command {command}"));
+        _tray.Hovered += () => _ui.TryEnqueue(() =>
+        {
+            // The pointer on the icon comes before the menu: the menu's check marks are fresh by the time it opens.
+            if (Environment.TickCount64 - _trayRefreshed > 2000)
+            {
+                _ = RefreshTrayAsync();
+            }
+        });
 
         Island = new IslandWindow(_loggers.CreateLogger<IslandWindow>());
-        Island.Submit = async text =>
-        {
-            Conversation.Add("You: " + text);
-            var reply = Core is { } core
-                ? await core.SubmitTextAsync(text, CancellationToken.None)
-                : "I'm not connected to ALDREN's background service right now.";
-            Conversation.Add("ALDREN: " + reply);
-            return reply;
-        };
+        Island.Submit = AskAsync;
         Island.ExpandRequested += ShowExpanded;
         Hotkeys = new HotkeyService(_host, _loggers.CreateLogger<HotkeyService>());
         Hotkeys.Pressed += () => _ui.TryEnqueue(() => RunLogged(Island.ToggleText, "hotkey"));
@@ -176,6 +262,7 @@ public partial class ShellApp : Application
         _stopKey = new StopKey(_host, _loggers.CreateLogger<StopKey>());
         _stopKey.Pressed += () => _ui.TryEnqueue(StopSpeaking);
         Island.StopRequested += StopSpeaking;
+        _tray.AskHint = Hotkeys.Active?.ToString();
 
         _watchdog = new CoreWatchdog(new CoreWatchdogPolicy(new RestartBackoff(TimeProvider.System)), _loggers.CreateLogger<CoreWatchdog>());
         _client = new CoreClient(
@@ -188,16 +275,45 @@ public partial class ShellApp : Application
                     // The cloud indicator: the tray says what's online, and the island shows it unless you're typing in it.
                     _tray.SetTooltip(activity is null ? "ALDREN" : $"ALDREN · online: {activity}");
                     Island.ShowCloud(activity);
-                }, "cloud indicator"))),
+                }, "cloud indicator")),
+                text => _ui.TryEnqueue(() => RunLogged(() => OnReplyProgress(text), "reply progress")),
+                YieldFocusAsync),
             _watchdog, _loggers.CreateLogger<CoreClient>());
         _client.Connected += core => _ui.TryEnqueue(() => _ = OnConnectedAsync(core));
         _client.Disconnected += () => _ui.TryEnqueue(() =>
         {
             _tray.StartWithWindowsAvailable = false;
+            _tray.Connected = false;
             // Core went away mid-reply: release Escape and close any voice state it can no longer end.
             OnVoiceState(VoiceState.Idle, "");
         });
         _client.Start();
+    }
+
+    /// <summary>Core is about to type into the window you were using: the island hands the keyboard back to it.</summary>
+    private Task YieldFocusAsync()
+    {
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!_ui.TryEnqueue(() =>
+            {
+                try
+                {
+                    Island.YieldFocus();
+                }
+                catch (Exception ex)
+                {
+                    _log.LogWarning(ex, "Couldn't hand focus back");
+                }
+                finally
+                {
+                    done.TrySetResult();
+                }
+            }))
+        {
+            done.TrySetResult();
+        }
+
+        return done.Task;
     }
 
     private void OnHostMessage(uint msg, nuint wParam, nint lParam)
@@ -232,11 +348,33 @@ public partial class ShellApp : Application
             case TrayCommand.Open:
                 ShowExpanded();
                 break;
+            case TrayCommand.Ask:
+                if (Island.State is not (IslandState.Text or IslandState.Reply))
+                {
+                    Island.ToggleText();
+                }
+
+                break;
             case TrayCommand.Settings:
                 ShowSettings();
                 break;
+            case TrayCommand.Silent:
+                _ = ChangeAsync(core => core.SetSilentAsync(!_tray.Silent, CancellationToken.None), "silent mode");
+                break;
+            case TrayCommand.GamingAuto:
+                _ = ChangeAsync(core => core.SetGamingModeAsync("auto", CancellationToken.None), "gaming mode");
+                break;
+            case TrayCommand.GamingOn:
+                _ = ChangeAsync(core => core.SetGamingModeAsync("on", CancellationToken.None), "gaming mode");
+                break;
+            case TrayCommand.GamingOff:
+                _ = ChangeAsync(core => core.SetGamingModeAsync("off", CancellationToken.None), "gaming mode");
+                break;
+            case TrayCommand.Focus:
+                _ = ChangeAsync(core => core.EndFocusAsync(CancellationToken.None), "the focus session");
+                break;
             case TrayCommand.StartWithWindows:
-                _ = ToggleStartWithWindowsAsync();
+                _ = ChangeAsync(core => core.SetStartWithWindowsAsync(!_tray.StartWithWindows, CancellationToken.None), "Start with Windows");
                 break;
             case TrayCommand.Quit:
                 _ = QuitAsync();
@@ -244,6 +382,27 @@ public partial class ShellApp : Application
         }
     }
 
+    /// <summary>A change made from the tray menu, then the menu's state read back from Core.</summary>
+    private async Task ChangeAsync(Func<IAldrenCore, Task> change, string what)
+    {
+        if (Core is not { } core)
+        {
+            return;
+        }
+
+        try
+        {
+            await change(core);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning("Couldn't change {What}: {Message}", what, ex.Message);
+        }
+
+        await RefreshTrayAsync();
+    }
+
+    /// <summary>Reads from Core what the tray menu shows: the check marks and whether a focus session runs.</summary>
     public async Task RefreshTrayAsync()
     {
         if (Core is not { } core)
@@ -251,33 +410,23 @@ public partial class ShellApp : Application
             return;
         }
 
+        _trayRefreshed = Environment.TickCount64;
         try
         {
             var status = await core.GetStatusAsync(CancellationToken.None);
+            var system = await core.GetSystemInfoAsync(CancellationToken.None);
+            var focus = await core.GetFocusAsync(CancellationToken.None);
+            _tray.Connected = true;
             _tray.StartWithWindows = status.StartWithWindows == StartupState.On;
             _tray.StartWithWindowsAvailable = status.StartWithWindows != StartupState.DisabledInWindows;
+            _tray.Silent = system.Silent;
+            _tray.Gaming = system.Gaming;
+            _tray.GamingActive = system.GamingActive;
+            _tray.FocusGoal = focus.Active ? focus.Goal ?? "" : null;
         }
         catch (Exception ex)
         {
             _log.LogWarning("Couldn't read Core's status: {Message}", ex.Message);
-        }
-    }
-
-    private async Task ToggleStartWithWindowsAsync()
-    {
-        if (Core is not { } core)
-        {
-            return;
-        }
-
-        try
-        {
-            await core.SetStartWithWindowsAsync(!_tray.StartWithWindows, CancellationToken.None);
-            await RefreshTrayAsync();
-        }
-        catch (Exception ex)
-        {
-            _log.LogWarning("Couldn't change Start with Windows: {Message}", ex.Message);
         }
     }
 
@@ -289,10 +438,17 @@ public partial class ShellApp : Application
         Aldren.App.Island.Native.Focus.SetForegroundWindow(WinRT.Interop.WindowNative.GetWindowHandle(_expanded));
     }
 
-    public void ShowSettings()
+    /// <param name="page">A page tag ("General", "Voice", "Browser"…) to open on; null keeps the page it shows.</param>
+    public void ShowSettings(string? page = null)
     {
         _settings ??= CreateWindow(new SettingsWindow(), () => _settings = null);
+        if (page is not null)
+        {
+            _settings.Show(page);
+        }
+
         _settings.Activate();
+        Aldren.App.Island.Native.Focus.SetForegroundWindow(WinRT.Interop.WindowNative.GetWindowHandle(_settings));
     }
 
     private static T CreateWindow<T>(T window, Action onClosed) where T : Window
@@ -321,10 +477,20 @@ public partial class ShellApp : Application
         return answer.Task;
     }
 
-    public void OpenLogsFolder()
+    public void OpenLogsFolder() => OpenFolder(LogsDirectory);
+
+    /// <summary>Opens a folder of ALDREN's own (settings, data, logs, models) in Explorer.</summary>
+    public void OpenFolder(string folder)
     {
-        Directory.CreateDirectory(LogsDirectory);
-        Process.Start(new ProcessStartInfo("explorer.exe", $"\"{LogsDirectory}\"") { UseShellExecute = true })?.Dispose();
+        try
+        {
+            Directory.CreateDirectory(folder);
+            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{folder}\"") { UseShellExecute = true })?.Dispose();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        {
+            _log.LogWarning("Couldn't open {Folder}: {Message}", folder, ex.Message);
+        }
     }
 
     public async Task QuitAsync()

@@ -13,6 +13,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Microsoft.Win32.SystemEvents" />
     <PackageReference Include="Microsoft.Windows.CsWin32" PrivateAssets="all" />
+    <PackageReference Include="Velopack" />
   </ItemGroup>
 
   <ItemGroup>
@@ -26,6 +27,8 @@
     <ProjectReference Include="..\Aldren.Perception\Aldren.Perception.csproj" />
     <ProjectReference Include="..\Aldren.Cloud\Aldren.Cloud.csproj" />
     <ProjectReference Include="..\Aldren.Research\Aldren.Research.csproj" />
+    <ProjectReference Include="..\Aldren.Browser\Aldren.Browser.csproj" />
+    <ProjectReference Include="..\Aldren.Integrations.Google\Aldren.Integrations.Google.csproj" />
   </ItemGroup>
 
 </Project>

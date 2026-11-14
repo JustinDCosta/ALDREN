@@ -27,7 +27,17 @@ public sealed class CoreService(
     Aldren.Memory.MemoryStore memory,
     Aldren.Assistant.AssistantStore assistant,
     Aldren.Presence.PresenceMonitor presence,
-    Aldren.Cloud.GatewaySupervisor gateway) : IAldrenCore
+    Aldren.Cloud.GatewaySupervisor gateway,
+    Aldren.Browser.BrowserBridge browser,
+    Aldren.Browser.SitePolicy sites,
+    Aldren.Integrations.Google.GoogleAccount google,
+    Aldren.Core.Focus.FocusService focus,
+    Aldren.Inference.ResidencyManager residency,
+    Aldren.Inference.InferenceOptions inference,
+    ModeState modes,
+    Tools.RoutineStore routines,
+    Aldren.Common.AldrenPaths paths,
+    Ipc.AppConnections connections) : IAldrenCore
 {
     public Task<CloudStatusInfo> GetCloudStatusAsync(CancellationToken cancellationToken) => Task.FromResult(CloudStatus());
 
@@ -114,8 +124,33 @@ public sealed class CoreService(
     public Task<CoreStatus> GetStatusAsync(CancellationToken cancellationToken) =>
         Task.FromResult(new CoreStatus(Version, Environment.ProcessId, _startedAt, startup.GetState(ExecutablePath)));
 
-    public Task<string> SubmitTextAsync(string text, CancellationToken cancellationToken) =>
-        orchestrator.HandleAsync(text, cancellationToken);
+    /// <summary>
+    /// Typed text in, the reply out. While the model writes, what it has so far goes to the App (at most every 60 ms) so
+    /// the island and the conversation window fill in live; the complete reply is still this call's result.
+    /// </summary>
+    public Task<string> SubmitTextAsync(string text, CancellationToken cancellationToken)
+    {
+        if (connections.Current is not { } app)
+        {
+            return orchestrator.HandleAsync(text, cancellationToken);
+        }
+
+        var written = new System.Text.StringBuilder();
+        var lastSent = 0L;
+        return orchestrator.HandleAsync(text, cancellationToken, delta =>
+        {
+            written.Append(delta);
+            var now = Environment.TickCount64;
+            if (now - lastSent < 60)
+            {
+                return;
+            }
+
+            lastSent = now;
+            _ = app.App.ShowReplyProgressAsync(written.ToString(), CancellationToken.None)
+                .ContinueWith(static t => _ = t.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+        });
+    }
 
     public Task PushToTalkAsync(CancellationToken cancellationToken) => voice.PushToTalkAsync();
 
@@ -171,6 +206,175 @@ public sealed class CoreService(
         }
 
         return Task.CompletedTask;
+    }
+
+    public async Task<BrowserStatusInfo> GetBrowserStatusAsync(CancellationToken cancellationToken) =>
+        new(Aldren.Browser.HostRegistration.IsRegistered, await browser.PingAsync(cancellationToken), Path.Combine(AppContext.BaseDirectory, "extension"),
+            Aldren.Browser.HostRegistration.ExtensionId, sites.All().Select(s => new SiteLevelItem(s.Key, s.Value.ToString())).OrderBy(s => s.Site).ToList());
+
+    public async Task<string> ConnectBrowserAsync(CancellationToken cancellationToken)
+    {
+        var manifest = Aldren.Browser.HostRegistration.Register(Path.Combine(AppContext.BaseDirectory, "Aldren.BrowserHost.exe"));
+        await AuditSettingAsync("connect_browser", "Registered the browser host for Chrome and Edge (HKCU)", cancellationToken);
+        return $"Registered. Now load the extension: chrome://extensions → Developer mode → Load unpacked → {Path.Combine(AppContext.BaseDirectory, "extension")}. (Manifest: {manifest})";
+    }
+
+    public async Task DisconnectBrowserAsync(CancellationToken cancellationToken)
+    {
+        Aldren.Browser.HostRegistration.Unregister();
+        await AuditSettingAsync("disconnect_browser", "Removed the browser host registration", cancellationToken);
+    }
+
+    public async Task SetSiteLevelAsync(string site, string? level, CancellationToken cancellationToken)
+    {
+        Aldren.Browser.SiteLevel? parsed = level is null ? null : Enum.Parse<Aldren.Browser.SiteLevel>(level, ignoreCase: true);
+        sites.Set(site, parsed);
+        await AuditSettingAsync("set_site_level", $"{Aldren.Browser.SitePolicy.Host(site)}: {level ?? "default"}", cancellationToken);
+    }
+
+    public Task<GoogleStatusInfo> GetGoogleStatusAsync(CancellationToken cancellationToken) =>
+        Task.FromResult(new GoogleStatusInfo(google.HasClient, google.SignedIn));
+
+    public async Task SetGoogleClientAsync(string clientId, string clientSecret, CancellationToken cancellationToken)
+    {
+        google.SetClient(clientId.Trim(), clientSecret.Trim());
+        await AuditSettingAsync("set_google_client", "Saved the Google OAuth client in Credential Manager", cancellationToken);
+    }
+
+    public async Task<string> SignInGoogleAsync(CancellationToken cancellationToken)
+    {
+        if (!google.HasClient)
+        {
+            return "Add your OAuth client ID and secret first (docs/guides/google-oauth.md).";
+        }
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromMinutes(5));
+        try
+        {
+            await google.CredentialAsync(timeout.Token);
+            await AuditSettingAsync("google_sign_in", "Signed in to Google (Calendar, Drive)", cancellationToken);
+            return "Signed in. Calendar and Drive are ready.";
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return "Sign-in timed out. Try again and finish it in the browser.";
+        }
+    }
+
+    public async Task DisconnectGoogleAsync(CancellationToken cancellationToken)
+    {
+        await google.DisconnectAsync(cancellationToken);
+        await AuditSettingAsync("google_disconnect", "Revoked Google access and deleted the token", cancellationToken);
+    }
+
+    public async Task<FocusInfo> GetFocusAsync(CancellationToken cancellationToken)
+    {
+        var stats = await focus.StatsAsync(7, cancellationToken);
+        var active = focus.Active;
+        return new FocusInfo(active is not null, active?.Goal, active is null ? null : focus.Local(active.Ends), active?.Slips ?? 0,
+            stats.Sessions, stats.Minutes, stats.Slips, stats.EndedEarly);
+    }
+
+    public async Task EndFocusAsync(CancellationToken cancellationToken) => await focus.EndAsync(early: true, cancellationToken);
+
+    private Task AuditSettingAsync(string action, string summary, CancellationToken ct) =>
+        audit.AppendAsync(
+            new AuditRecord(
+                time.GetUtcNow(), Guid.NewGuid().ToString("N"), action, RiskTier.Impactful, CallOrigin.User, "{}",
+                AuditStage.Finished, ToolOutcomeStatus.Succeeded, summary, TimeSpan.Zero, Confirmed: false, Tainted: false),
+            CancellationToken.None);
+
+    public async Task<SystemInfo> GetSystemInfoAsync(CancellationToken cancellationToken)
+    {
+        var s = residency.Status;
+        using var self = System.Diagnostics.Process.GetCurrentProcess();
+        var modelMb = MemoryMb(residency.GpuProcessId) + MemoryMb(residency.CpuProcessId);
+        return new SystemInfo(
+            s.GpuLoaded ? Path.GetFileNameWithoutExtension(inference.QuickModelPath) : s.CpuLoaded ? Path.GetFileNameWithoutExtension(inference.CpuModelPath) : "",
+            s.GpuLoaded, s.CpuLoaded, s.FreeVramMiB, s.OnAc,
+            s.GamingOverride switch { true => "on", false => "off", null => "auto" }, s.GamingMode, modes.Silent,
+            self.WorkingSet64 / (1024 * 1024), modelMb, (time.GetUtcNow() - _startedAt).TotalHours,
+            paths.SettingsDirectory, paths.DataDirectory, inference.DataRoot,
+            FileKb(paths.DatabasePath), FolderKb(paths.LogsDirectory),
+            await memory.CountAsync(cancellationToken),
+            (await assistant.ActiveRemindersAsync(cancellationToken)).Count,
+            (await assistant.OpenTasksAsync(cancellationToken)).Count,
+            routines.All().Count);
+
+        static long MemoryMb(int? processId)
+        {
+            if (processId is not { } id)
+            {
+                return 0;
+            }
+
+            try
+            {
+                using var process = System.Diagnostics.Process.GetProcessById(id);
+                return process.WorkingSet64 / (1024 * 1024);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                return 0;
+            }
+        }
+
+        static long FileKb(string path) => File.Exists(path) ? new FileInfo(path).Length / 1024 : 0;
+
+        static long FolderKb(string path)
+        {
+            try
+            {
+                return Directory.Exists(path) ? new DirectoryInfo(path).EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length) / 1024 : 0;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return 0;
+            }
+        }
+    }
+
+    public Task NewConversationAsync(CancellationToken cancellationToken) => orchestrator.ResetAsync(cancellationToken);
+
+    public Task SetGamingModeAsync(string mode, CancellationToken cancellationToken) =>
+        residency.SetGamingOverrideAsync(mode.ToLowerInvariant() switch { "on" => true, "off" => false, _ => null }, cancellationToken);
+
+    public Task SetSilentAsync(bool silent, CancellationToken cancellationToken)
+    {
+        modes.Silent = silent;
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<RoutineItem>> GetRoutinesAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<RoutineItem>>(routines.All().Select(r => new RoutineItem(r.Name, r.Steps)).ToList());
+
+    public async Task<string> SaveRoutineAsync(string name, string steps, CancellationToken cancellationToken)
+    {
+        var parsed = Tools.CreateRoutineTool.SplitSteps(steps);
+        if (string.IsNullOrWhiteSpace(name) || parsed.Count == 0)
+        {
+            return "A routine needs a name and at least one step.";
+        }
+
+        var routine = routines.Save(name, parsed);
+        await AuditUserActionAsync("save_routine", "{}", $"Saved from Settings > Automations ({routine.Steps.Count} steps)");
+        return $"Saved \"{routine.Name}\" with {routine.Steps.Count} step{(routine.Steps.Count == 1 ? "" : "s")}.";
+    }
+
+    public async Task DeleteRoutineAsync(string name, CancellationToken cancellationToken)
+    {
+        if (routines.Delete(name))
+        {
+            await AuditUserActionAsync("delete_routine", "{}", "Deleted from Settings > Automations");
+        }
+    }
+
+    public async Task<int> DeleteAllMemoriesAsync(CancellationToken cancellationToken)
+    {
+        var deleted = await memory.DeleteAllAsync(cancellationToken);
+        await AuditUserActionAsync("delete_all_memories", "{}", $"Deleted {deleted} memories from Settings > Privacy & data");
+        return deleted;
     }
 
     public Task ShutdownAsync(CancellationToken cancellationToken)

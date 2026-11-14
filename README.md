@@ -2,7 +2,7 @@
 
 A local-first, JARVIS-inspired personal AI assistant for Windows 11. You summon it by saying "ALDREN" (pronounced *al-drin*) or by typing. It talks naturally, operates your apps, windows, files and browser through a safety-checked automation layer, understands your screen, manages reminders and your Google calendar, researches online when asked, and helps you focus.
 
-> **Status:** Phases 0–5 are done or in acceptance. Phase 6 (the cloud gateway under ALDREN's supervision, the Cloud Policy Layer and cited online research) is implemented; it needs your provider keys in the gateway dashboard. See [docs/STATUS.md](docs/STATUS.md).
+> **Status:** Phases 0–6 are done or in acceptance (Phase 6 needs your provider keys in the gateway dashboard). Phases 7–9 (the browser Companion, Google Calendar and Drive, focus mode, personality modes, routines, voice typing, the developer assistant and the Velopack installer) are implemented and not yet tried through ALDREN; Google needs your own OAuth client. See [docs/STATUS.md](docs/STATUS.md).
 
 ## Design in one minute
 
@@ -26,6 +26,9 @@ A local-first, JARVIS-inspired personal AI assistant for Windows 11. You summon 
 | [docs/plans/phase-4.md](docs/plans/phase-4.md) | Phase 4 plan: personal assistant |
 | [docs/plans/phase-5.md](docs/plans/phase-5.md) | Phase 5 plan: Action Brain |
 | [docs/plans/phase-6.md](docs/plans/phase-6.md) | Phase 6 plan: cloud gateway and Research Brain |
+| [docs/plans/phase-7.md](docs/plans/phase-7.md) | Phase 7 plan: browser and Google |
+| [docs/plans/phase-8.md](docs/plans/phase-8.md) | Phase 8 plan: focus mode |
+| [docs/plans/phase-9.md](docs/plans/phase-9.md) | Phase 9 plan: modes, routines, voice typing, packaging |
 | [docs/guides/google-oauth.md](docs/guides/google-oauth.md) | Creating the Google Cloud project for Calendar and Drive |
 | [docs/acceptance/phase-1.md](docs/acceptance/phase-1.md) | Phase 1 acceptance steps |
 | [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) | Pinned packages, licences and purposes |

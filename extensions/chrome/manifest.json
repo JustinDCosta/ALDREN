@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "ALDREN Companion",
+  "description": "Lets ALDREN, your local assistant, read pages, click, fill forms, download and keep focus sessions, on your request.",
+  "version": "0.7.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwIlSW8SNuIMWGgcq0qn/pAuzavTv5lq3a0PpF1iGcBVJ7psHy00EiYmPyTY/VxklanHCtuOSqk+eZJ/lyfh4XbVJEeGeDhknq7TJbEqHL2bxmA43OCd7bBNa93mVk3eUQA7AIHNIKIUteWaf63XqtOyYA7ScG3nztAmVx8+sVGfrYRBqi2Sv8HOsMqZeMiHSFoAwuxfcSesp2sZ1sjB06S+mReku7r8MbMr5At9koVhbEmoNqFLSMkIJOjlWdiN5vteJr3Rwbrl85QhzSZOdH+lXK/lV3cuTTAoEzxyff+gvEU1LRduztxETchAYiEhoXftCg9itea59MEPb0dg5LQIDAQAB",
+  "permissions": ["nativeMessaging", "tabs", "scripting", "downloads", "declarativeNetRequest", "storage", "alarms"],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "background": { "service_worker": "background.js" },
+  "web_accessible_resources": [{ "resources": ["blocked.html", "blocked.js"], "matches": ["<all_urls>"] }],
+  "action": { "default_title": "ALDREN Companion" }
+}

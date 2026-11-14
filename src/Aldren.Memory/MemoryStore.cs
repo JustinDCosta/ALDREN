@@ -96,6 +96,25 @@ public sealed class MemoryStore(string databasePath)
         return await command.ExecuteNonQueryAsync(ct) > 0;
     }
 
+    public async Task<int> CountAsync(CancellationToken ct)
+    {
+        await using var db = await OpenAsync(ct);
+        await using var command = db.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM memories;";
+        return Convert.ToInt32(await command.ExecuteScalarAsync(ct), CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>Forgets everything (Settings &gt; Privacy, on your click). Returns how many entries were deleted.</summary>
+    public async Task<int> DeleteAllAsync(CancellationToken ct)
+    {
+        var count = await CountAsync(ct);
+        await using var db = await OpenAsync(ct);
+        await using var command = db.CreateCommand();
+        command.CommandText = "DELETE FROM memories; DELETE FROM memories_fts;";
+        await command.ExecuteNonQueryAsync(ct);
+        return count;
+    }
+
     private static async Task<IReadOnlyList<MemoryEntry>> ReadAsync(SqliteCommand command, CancellationToken ct)
     {
         var list = new List<MemoryEntry>();

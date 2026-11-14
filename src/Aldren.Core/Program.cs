@@ -26,6 +26,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 using Serilog;
 
+// Velopack install, update and uninstall hooks (Phase 9); returns at once when ALDREN wasn't installed by Velopack.
+Velopack.VelopackApp.Build().Run();
+
 using var instance = SingleInstance.TryAcquire(SingleInstance.CoreName);
 if (instance is null)
 {
@@ -38,8 +41,12 @@ Aldren.Windows.Layouts.WindowManager.BecomeDpiAware();
 
 var paths = AldrenPaths.FromEnvironment();
 Directory.CreateDirectory(paths.SettingsDirectory);
-DataFolderAcl.RestrictToCurrentUser(paths.DataDirectory);
+var aclProblem = DataFolderAcl.RestrictToCurrentUser(paths.DataDirectory);
 Log.Logger = LogSetup.Configure(new LoggerConfiguration(), paths, "core").CreateLogger();
+if (aclProblem is not null)
+{
+    Log.Warning("The data folder couldn't be restricted to your account ({Problem}); it keeps the permissions it inherited", aclProblem);
+}
 
 try
 {
@@ -72,7 +79,7 @@ try
     builder.Services.AddSingleton<IRegistryValues, CurrentUserRegistry>();
     builder.Services.AddSingleton<StartupEntry>();
 
-    builder.Services.AddSingleton(PermissionCatalog.Phase5);
+    builder.Services.AddSingleton(PermissionCatalog.Phase9);
     builder.Services.AddSingleton<IPermissionStore>(sp => new PermissionStore(paths.PermissionsFile, sp.GetRequiredService<PermissionCatalog>()));
     builder.Services.AddSingleton<IAuditLog>(new SqliteAuditLog(paths.DatabasePath));
     builder.Services.AddSingleton<ITool, GetTimeTool>();
@@ -126,6 +133,29 @@ try
     builder.Services.AddSingleton<ITool, OperateControlTool>();
     builder.Services.AddSingleton<ITool, ReadClipboardTool>();
     builder.Services.AddSingleton<ITool, CopyTextTool>();
+    builder.Services.AddSingleton<ITool, BrowserTabsTool>();
+    builder.Services.AddSingleton<ITool, BrowserReadTool>();
+    builder.Services.AddSingleton<ITool, BrowserOpenTool>();
+    builder.Services.AddSingleton<ITool, BrowserClickTool>();
+    builder.Services.AddSingleton<ITool, BrowserFillTool>();
+    builder.Services.AddSingleton<ITool, BrowserDownloadTool>();
+    builder.Services.AddSingleton<ITool, BrowserNavigateTool>();
+    builder.Services.AddSingleton<ITool, BrowserTabTool>();
+    builder.Services.AddSingleton<ITool, CalendarAgendaTool>();
+    builder.Services.AddSingleton<ITool, CalendarCreateTool>();
+    builder.Services.AddSingleton<ITool, CalendarDeleteTool>();
+    builder.Services.AddSingleton<ITool, DriveSearchTool>();
+    builder.Services.AddSingleton<ITool, DriveDownloadTool>();
+    builder.Services.AddSingleton<ITool, DriveUploadTool>();
+    builder.Services.AddSingleton<ITool, DriveRenameTool>();
+    builder.Services.AddSingleton<ITool, StartFocusTool>();
+    builder.Services.AddSingleton<ITool, EndFocusTool>();
+    builder.Services.AddSingleton<ITool, FocusStatusTool>();
+    builder.Services.AddSingleton<ITool, FocusEnforceTool>();
+    builder.Services.AddSingleton<ITool, GitTool>();
+    builder.Services.AddSingleton<ITool, CreateRoutineTool>();
+    builder.Services.AddSingleton<ITool, ListRoutinesTool>();
+    builder.Services.AddSingleton<ITool, TypeTextTool>();
 
     builder.Services.AddSingleton(new InferenceOptions());
     builder.Services.AddSingleton<InferenceHost>();
@@ -170,6 +200,17 @@ try
     builder.Services.AddSingleton<IToolPolicy, TierPolicy>();
     builder.Services.AddSingleton<IToolPolicy, TaintPolicy>();
     builder.Services.AddSingleton<ToolGateway>();
+    builder.Services.AddSingleton<ModeState>();
+    builder.Services.AddSingleton(new RoutineStore(Path.Combine(paths.DataDirectory, "routines.json")));
+    builder.Services.AddSingleton<Aldren.Browser.BrowserBridge>();
+    builder.Services.AddSingleton<BrowserPage>();
+    builder.Services.AddSingleton(new Aldren.Browser.SitePolicy(Path.Combine(paths.DataDirectory, "site-levels.json")));
+    builder.Services.AddSingleton<Aldren.Integrations.Google.GoogleAccount>();
+    builder.Services.AddSingleton<Aldren.Integrations.Google.GoogleCalendar>();
+    builder.Services.AddSingleton<Aldren.Integrations.Google.GoogleDrive>();
+    builder.Services.AddSingleton(sp => new Aldren.Core.Focus.FocusService(
+        paths.DatabasePath, sp.GetRequiredService<Aldren.Browser.BrowserBridge>(), sp, sp.GetRequiredService<AppConnections>(),
+        sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<ILogger<Aldren.Core.Focus.FocusService>>()));
     builder.Services.AddSingleton<Orchestrator>();
 
     builder.Services.AddHostedService<CoreRpcServer>();
@@ -181,6 +222,7 @@ try
     builder.Services.AddHostedService(sp => sp.GetRequiredService<PresenceMonitor>());
     builder.Services.AddHostedService<PresenceCoordinator>();
     builder.Services.AddHostedService(sp => sp.GetRequiredService<Aldren.Cloud.GatewaySupervisor>());
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<Aldren.Core.Focus.FocusService>());
 
     using var host = builder.Build();
     var supervisor = host.Services.GetRequiredService<AppSupervisor>();

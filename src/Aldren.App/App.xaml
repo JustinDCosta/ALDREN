@@ -8,6 +8,126 @@
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
+
+            <!-- ALDREN's own colours, taken from its icon: the cyan ring on a near-black disc. -->
+            <Color x:Key="AldrenCyan">#40DCFF</Color>
+            <Color x:Key="AldrenBlue">#5C8DFF</Color>
+            <LinearGradientBrush x:Key="AldrenBrandBrush" StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Offset="0" Color="#40DCFF" />
+                <GradientStop Offset="1" Color="#5C8DFF" />
+            </LinearGradientBrush>
+            <LinearGradientBrush x:Key="AldrenBrandBrushLight" StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Offset="0" Color="#7DE8FF" />
+                <GradientStop Offset="1" Color="#84A9FF" />
+            </LinearGradientBrush>
+            <LinearGradientBrush x:Key="AldrenBrandBrushDark" StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Offset="0" Color="#2FB9DA" />
+                <GradientStop Offset="1" Color="#4A74D8" />
+            </LinearGradientBrush>
+            <SolidColorBrush x:Key="AldrenOnBrandBrush" Color="#06121A" />
+
+            <!-- A text field with no box of its own, for use inside a shape that already is the box (the island's pill,
+                 the conversation's composer): only the caret, the text and the placeholder. -->
+            <Style x:Key="AldrenBareTextBoxStyle" TargetType="TextBox">
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
+                <Setter Property="PlaceholderForeground" Value="{ThemeResource TextFillColorTertiaryBrush}" />
+                <Setter Property="FontFamily" Value="Segoe UI Variable Text" />
+                <Setter Property="FontSize" Value="15" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="MinHeight" Value="0" />
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="UseSystemFocusVisuals" Value="False" />
+                <Setter Property="IsSpellCheckEnabled" Value="False" />
+                <Setter Property="ScrollViewer.HorizontalScrollMode" Value="Disabled" />
+                <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+                <Setter Property="ScrollViewer.VerticalScrollMode" Value="Auto" />
+                <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Hidden" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TextBox">
+                            <Grid Background="Transparent">
+                                <TextBlock
+                                    x:Name="PlaceholderTextContentPresenter"
+                                    VerticalAlignment="Top"
+                                    FontFamily="{TemplateBinding FontFamily}"
+                                    FontSize="{TemplateBinding FontSize}"
+                                    Foreground="{TemplateBinding PlaceholderForeground}"
+                                    IsHitTestVisible="False"
+                                    Text="{TemplateBinding PlaceholderText}"
+                                    TextTrimming="CharacterEllipsis"
+                                    TextWrapping="NoWrap" />
+                                <ScrollViewer
+                                    x:Name="ContentElement"
+                                    Padding="{TemplateBinding Padding}"
+                                    AutomationProperties.AccessibilityView="Raw"
+                                    HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
+                                    HorizontalScrollMode="{TemplateBinding ScrollViewer.HorizontalScrollMode}"
+                                    IsTabStop="False"
+                                    VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}"
+                                    VerticalScrollMode="{TemplateBinding ScrollViewer.VerticalScrollMode}"
+                                    ZoomMode="Disabled" />
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- A card in Settings: one setting, or a group of related lines. -->
+            <Style x:Key="AldrenCardStyle" TargetType="Border">
+                <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Padding" Value="16,14" />
+            </Style>
+
+            <!-- A round button filled with the brand gradient (send). -->
+            <Style x:Key="AldrenBrandRoundButtonStyle" TargetType="Button">
+                <Setter Property="Width" Value="32" />
+                <Setter Property="Height" Value="32" />
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="MinHeight" Value="0" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="CornerRadius" Value="16" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Background" Value="{StaticResource AldrenBrandBrush}" />
+                <Setter Property="Foreground" Value="{StaticResource AldrenOnBrandBrush}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Grid x:Name="Root" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}">
+                                <VisualStateManager.VisualStateGroups>
+                                    <VisualStateGroup x:Name="CommonStates">
+                                        <VisualState x:Name="Normal" />
+                                        <VisualState x:Name="PointerOver">
+                                            <VisualState.Setters>
+                                                <Setter Target="Root.Background" Value="{StaticResource AldrenBrandBrushLight}" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="Pressed">
+                                            <VisualState.Setters>
+                                                <Setter Target="Root.Background" Value="{StaticResource AldrenBrandBrushDark}" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="Disabled">
+                                            <VisualState.Setters>
+                                                <Setter Target="Root.Opacity" Value="0.35" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                </VisualStateManager.VisualStateGroups>
+                                <ContentPresenter
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Content="{TemplateBinding Content}"
+                                    Foreground="{TemplateBinding Foreground}" />
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

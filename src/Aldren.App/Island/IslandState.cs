@@ -1,12 +1,14 @@
-using System.Numerics;
-
 namespace Aldren.App.Island;
 
 public enum IslandState
 {
     Hidden,
     Compact,
+
+    /// <summary>The text field, with focus.</summary>
     Text,
+
+    /// <summary>An answer: under the text field while you type, or on its own after you clicked away.</summary>
     Reply,
     Listening,
     Transcribing,
@@ -18,30 +20,18 @@ public enum IslandState
     Error,
 }
 
-/// <summary>The pill's size (DIPs) and corner radius in each state.</summary>
-public static class IslandShapes
+/// <summary>Sample text for previewing a state from Settings &gt; Diagnostics.</summary>
+public static class IslandSamples
 {
-    public static (Vector2 Size, float Radius) For(IslandState state) => state switch
-    {
-        IslandState.Hidden => (Vector2.Zero, 0),
-        IslandState.Compact => (new Vector2(180, 36), 18),
-        IslandState.Text => (new Vector2(440, 64), 28),
-        // Up to the island window's height (260 less the top margin); anything longer is one click away in the sidebar.
-        IslandState.Reply => (new Vector2(560, 244), 30),
-        IslandState.Confirm => (new Vector2(560, 230), 30),
-        IslandState.Error => (new Vector2(420, 80), 28),
-        _ => (new Vector2(420, 100), 30),
-    };
-
-    /// <summary>Sample text for previewing a state from Diagnostics; the real content arrives in Phase 3.</summary>
-    public static string Sample(IslandState state) => state switch
+    public static string For(IslandState state) => state switch
     {
         IslandState.Listening => "Listening…",
-        IslandState.Transcribing => "open VS Code and…",
-        IslandState.Thinking => "Thinking…",
-        IslandState.Acting => "Opening VS Code ✓\nArranging windows…",
+        IslandState.Transcribing => "Got it…",
+        IslandState.Thinking => "open VS Code and arrange my windows for coding",
+        IslandState.Acting => "Opening VS Code, then arranging the windows…",
         IslandState.Researching => "Searching 3 sources…",
-        IslandState.Speaking => "Your next meeting is at 14:00.",
+        IslandState.Speaking => "Your next meeting is at 14:00, boss. You have two reminders before it: call the bank at noon, and pick up the parcel on the way back.",
+        IslandState.Reply => "It's 14:05. You have one reminder left today.",
         IslandState.Error => "Something went wrong. Details are in the log.",
         IslandState.Compact => "ALDREN",
         _ => "",

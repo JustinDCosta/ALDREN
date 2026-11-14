@@ -15,12 +15,14 @@ namespace Aldren.Core.Voice;
 /// speak sentence by sentence → an 8 s follow-up window without the wake word. Half-duplex: what the microphone hears
 /// while ALDREN speaks is ignored. The hotkey, the wake word or "stop" interrupts.
 /// </summary>
-public sealed class VoiceLoop(
+public sealed partial class VoiceLoop(
     VoiceOptions options,
     Orchestrator orchestrator,
     SettingsStore settings,
     ResidencyManager residency,
     AppConnections connections,
+    ModeState modes,
+    IServiceProvider services,
     ILogger<VoiceLoop> log) : BackgroundService
 {
     private enum Mode
@@ -76,7 +78,7 @@ public sealed class VoiceLoop(
     /// </summary>
     public async Task<bool> AnnounceAsync(string text, CancellationToken ct)
     {
-        if (_speaker is null || !settings.Current.Voice.SpeakReplies || residency.GamingMode || GamingDetector.FullscreenAppRunning())
+        if (_speaker is null || modes.Silent || !settings.Current.Voice.SpeakReplies || residency.GamingMode || GamingDetector.FullscreenAppRunning())
         {
             return false;
         }
@@ -327,7 +329,7 @@ public sealed class VoiceLoop(
             var followUp = false;
             while (!ct.IsCancellationRequested && !_endTurn)
             {
-                var audio = await ListenAsync(followUp ? options.FollowUpWindow : options.NoSpeechTimeout, followUp, ct);
+                var audio = await ListenAsync(modes.Dictating ? TimeSpan.FromSeconds(20) : followUp ? options.FollowUpWindow : options.NoSpeechTimeout, followUp, ct);
                 if (audio is null)
                 {
                     break;
@@ -339,6 +341,12 @@ public sealed class VoiceLoop(
                 var (text, recognition) = _recognizer.Transcribe(audio);
                 SaveForDiagnosis(audio, text);
                 log.LogInformation("Heard \"{Text}\" ({Ms} ms to recognise)", text, (int)recognition.TotalMilliseconds);
+                if (text.Length > 0 && await DictationAsync(text, ct))
+                {
+                    followUp = true;
+                    continue;
+                }
+
                 if (text.Length == 0 || IsStop(text))
                 {
                     break;
@@ -363,6 +371,8 @@ public sealed class VoiceLoop(
         finally
         {
             _endTurn = false;
+            // Dictation lasts one voice turn at most, so a later "open Chrome" is never typed into a window by surprise.
+            modes.Dictating = false;
             _mode = Mode.Idle;
             _wake?.Reset();
             if (_wake is null)
@@ -425,7 +435,7 @@ public sealed class VoiceLoop(
     private async Task RespondAsync(string text, Stopwatch endOfSpeech, CancellationToken ct)
     {
         // No speech while you game, watch fullscreen or switch it off: the island shows the reply instead.
-        var quiet = !settings.Current.Voice.SpeakReplies || residency.GamingMode || GamingDetector.FullscreenAppRunning();
+        var quiet = modes.Silent || !settings.Current.Voice.SpeakReplies || residency.GamingMode || GamingDetector.FullscreenAppRunning();
         if (quiet)
         {
             await ShowAsync(VoiceState.Speaking, await orchestrator.HandleAsync(text, ct));
@@ -528,6 +538,66 @@ public sealed class VoiceLoop(
             log.LogDebug(ex, "Couldn't save the diagnostic clip");
         }
     }
+
+    /// <summary>
+    /// Voice typing (Phase 9): "start dictation", then each utterance is typed into the focused field through the Tool Gateway
+    /// (type_text), until "stop dictation" or the turn ends. Returns false when the utterance is a normal request.
+    /// </summary>
+    private async Task<bool> DictationAsync(string text, CancellationToken ct)
+    {
+        // People often say it in one breath: "Start dictation. I love mangoes. Stop dictation."
+        var rest = text.Trim();
+        var started = DictationStart().Match(rest);
+        if (started.Success)
+        {
+            modes.Dictating = true;
+            rest = started.Groups["rest"].Value;
+        }
+        else if (!modes.Dictating)
+        {
+            return false;
+        }
+
+        var stop = DictationStop().Match(rest);
+        if (stop.Success)
+        {
+            rest = stop.Groups["before"].Value;
+        }
+
+        rest = rest.Trim();
+        string message;
+        if (rest.Length > 0)
+        {
+            var gateway = (Aldren.Security.Gateway.ToolGateway)services.GetService(typeof(Aldren.Security.Gateway.ToolGateway))!;
+            var args = System.Text.Json.JsonSerializer.SerializeToElement(new { text = rest + " " });
+            var outcome = await gateway.InvokeAsync(
+                new Aldren.Security.Gateway.ToolCall("type_text", args, Guid.NewGuid().ToString("N")),
+                new Aldren.Security.Gateway.CallContext(Aldren.Security.Gateway.CallOrigin.User, []),
+                ct);
+            log.LogInformation("Dictation: {Chars} characters, {Status}", rest.Length, outcome.Status);
+            message = outcome.Status == Aldren.Security.Gateway.ToolOutcomeStatus.Succeeded
+                ? stop.Success ? "Typed. Dictation off." : "Typed. Keep going, or say \"stop dictation\"."
+                : outcome.Message;
+        }
+        else
+        {
+            message = stop.Success ? "Dictation off." : "Dictation on: I'll type what you say into the field you're in. Say \"stop dictation\" to finish.";
+        }
+
+        if (stop.Success)
+        {
+            modes.Dictating = false;
+        }
+
+        await ShowAsync(VoiceState.Speaking, message);
+        return true;
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"^(?:start dictation(?: mode)?|start dictating|dictation mode|take dictation|dictation on|type what i say)(?! +(?:off|of))[\s\.,!:;]*(?<rest>.*)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline)]
+    private static partial System.Text.RegularExpressions.Regex DictationStart();
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"^(?<before>.*?)[\s\.,!;]*\b(?:(?:stop|end|exit|quit|finish|close)(?: the)? dictation(?: mode)?|stop dictating|dictation(?: mode)? (?:off|of|stop|end)|turn (?:off|of) (?:the )?dictation(?: mode)?|turn (?:the )?dictation(?: mode)? (?:off|of)|stop typing)[\s\.!]*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline)]
+    private static partial System.Text.RegularExpressions.Regex DictationStop();
 
     private static bool IsStop(string text)
     {

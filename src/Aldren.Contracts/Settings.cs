@@ -7,7 +7,8 @@ public sealed record AldrenSettings(int SchemaVersion, GeneralSettings General, 
     public static AldrenSettings Default { get; } = new(CurrentSchemaVersion, new GeneralSettings(), new VoiceSettings(), new PresenceSettings(), new CloudSettings());
 }
 
-public sealed record GeneralSettings(string Hotkey = "Ctrl+/", bool ShowOnStream = false);
+/// <param name="Personality">friendly, professional, sarcastic, serious, concise or detailed (Phase 9).</param>
+public sealed record GeneralSettings(string Hotkey = "Ctrl+/", bool ShowOnStream = false, string Personality = "friendly");
 
 /// <param name="WakeWord">Off by default: the wake word is still short of its false-wake target (Phase 3 plan).</param>
 /// <param name="TranscriptCheck">A wake must also be heard as "Aldrin" in the transcript: fewer false wakes, more misses.</param>

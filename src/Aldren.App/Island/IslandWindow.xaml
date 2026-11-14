@@ -5,64 +5,329 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="ALDREN island">
     <Grid x:Name="Root" Background="Transparent" RequestedTheme="Dark" KeyDown="OnRootKeyDown">
-        <!-- The pill itself is a Composition shape attached to PillHost; the content sits above it. -->
-        <Border x:Name="PillHost" />
-        <Grid
-            x:Name="Panel"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Top"
-            RowSpacing="8">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
+        <Grid.Resources>
+            <SolidColorBrush x:Key="IslandText" Color="#F5FFFFFF" />
+            <SolidColorBrush x:Key="IslandTextSecondary" Color="#B3FFFFFF" />
+            <SolidColorBrush x:Key="IslandTextTertiary" Color="#73FFFFFF" />
+            <SolidColorBrush x:Key="IslandHairline" Color="#1FFFFFFF" />
 
-            <TextBlock
-                x:Name="Caption"
-                VerticalAlignment="Center"
-                FontFamily="Segoe UI Variable Text"
-                FontSize="14"
-                Foreground="#E6FFFFFF"
-                IsTextSelectionEnabled="True"
-                TextAlignment="Center"
-                TextWrapping="Wrap"
-                TextTrimming="CharacterEllipsis" />
+            <!-- The text field is the pill itself: no box, no underline, nothing but the caret and the text. -->
+            <Style x:Key="IslandInputStyle" BasedOn="{StaticResource AldrenBareTextBoxStyle}" TargetType="TextBox">
+                <Setter Property="Foreground" Value="{StaticResource IslandText}" />
+                <Setter Property="PlaceholderForeground" Value="{StaticResource IslandTextTertiary}" />
+            </Style>
 
-            <TextBox
-                x:Name="Input"
-                Grid.Row="1"
-                AutomationProperties.Name="Message to ALDREN"
-                PlaceholderText="Ask ALDREN… (Enter sends, Ctrl+Enter expands, Esc closes)"
-                Visibility="Collapsed"
-                KeyDown="OnInputKeyDown"
-                TextChanged="OnInputTextChanged" />
+            <!-- Quiet round button on the pill (stop). -->
+            <Style x:Key="IslandQuietRoundButtonStyle" TargetType="Button">
+                <Setter Property="Width" Value="30" />
+                <Setter Property="Height" Value="30" />
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="MinHeight" Value="0" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="CornerRadius" Value="15" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Background" Value="#24FFFFFF" />
+                <Setter Property="Foreground" Value="{StaticResource IslandText}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Grid x:Name="Root" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}">
+                                <VisualStateManager.VisualStateGroups>
+                                    <VisualStateGroup x:Name="CommonStates">
+                                        <VisualState x:Name="Normal" />
+                                        <VisualState x:Name="PointerOver">
+                                            <VisualState.Setters>
+                                                <Setter Target="Root.Background" Value="#3DFFFFFF" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="Pressed">
+                                            <VisualState.Setters>
+                                                <Setter Target="Root.Background" Value="#1AFFFFFF" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                </VisualStateManager.VisualStateGroups>
+                                <ContentPresenter
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Content="{TemplateBinding Content}"
+                                    Foreground="{TemplateBinding Foreground}" />
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </Grid.Resources>
 
-            <Button
-                x:Name="StopButton"
-                Grid.Row="1"
+        <!-- The shadow and the pill are Composition visuals attached here; everything else sits above them. -->
+        <Border x:Name="PillHost" IsHitTestVisible="False" />
+
+        <!-- Clipped to the pill's shape while it morphs, so content never pokes out of it. -->
+        <Grid x:Name="ClipHost">
+            <Grid
+                x:Name="Panel"
+                MaxWidth="580"
                 HorizontalAlignment="Center"
-                Padding="14,3"
-                MinHeight="26"
-                FontSize="12"
-                AutomationProperties.Name="Stop speaking"
-                Content="■  Stop  (Esc)"
-                Visibility="Collapsed"
-                Click="OnStopClick" />
+                VerticalAlignment="Top"
+                SizeChanged="OnPanelSizeChanged">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-            <StackPanel
-                x:Name="ConfirmPanel"
-                Grid.RowSpan="2"
-                Spacing="8"
-                Visibility="Collapsed">
-                <TextBlock x:Name="ConfirmTitle" FontSize="16" FontWeight="SemiBold" Text="Allow this action?" />
-                <TextBlock x:Name="ConfirmSummary" TextWrapping="Wrap" />
-                <TextBlock x:Name="ConfirmTier" Foreground="#B3FFFFFF" />
-                <TextBlock x:Name="ConfirmSources" Foreground="#FFFFC864" TextWrapping="Wrap" Visibility="Collapsed" />
-                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
-                    <Button x:Name="NoButton" AutomationProperties.Name="No" Content="No (N)" MinWidth="96" Click="OnNoClick" />
-                    <Button x:Name="YesButton" AutomationProperties.Name="Yes" Content="Yes (Y)" MinWidth="96" Style="{StaticResource AccentButtonStyle}" Click="OnYesClick" />
-                </StackPanel>
-            </StackPanel>
+                <!-- One line: what ALDREN is doing · what is being said or typed · what you can press. -->
+                <Grid x:Name="Line" MinHeight="48" Padding="14,0,9,0" ColumnSpacing="11">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Grid
+                        x:Name="Indicator"
+                        Width="22"
+                        Height="22"
+                        Margin="0,13,0,0"
+                        VerticalAlignment="Top">
+                        <!-- ALDREN's mark, as in its icon: a ring and a dot. -->
+                        <Grid x:Name="Mark">
+                            <Ellipse
+                                Width="16"
+                                Height="16"
+                                Stroke="{StaticResource AldrenBrandBrush}"
+                                StrokeThickness="2.6" />
+                            <Ellipse Width="4.6" Height="4.6" Fill="#D6FAFF" />
+                        </Grid>
+                        <ProgressRing
+                            x:Name="Spinner"
+                            Width="18"
+                            Height="18"
+                            MinWidth="0"
+                            MinHeight="0"
+                            Foreground="{StaticResource AldrenBrandBrush}"
+                            IsActive="False"
+                            Visibility="Collapsed" />
+                        <StackPanel
+                            x:Name="Bars"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal"
+                            Spacing="2.5"
+                            Visibility="Collapsed">
+                            <Rectangle x:Name="Bar1" Width="3" Height="16" Fill="{StaticResource AldrenBrandBrush}" RadiusX="1.5" RadiusY="1.5" />
+                            <Rectangle x:Name="Bar2" Width="3" Height="16" Fill="{StaticResource AldrenBrandBrush}" RadiusX="1.5" RadiusY="1.5" />
+                            <Rectangle x:Name="Bar3" Width="3" Height="16" Fill="{StaticResource AldrenBrandBrush}" RadiusX="1.5" RadiusY="1.5" />
+                            <Rectangle x:Name="Bar4" Width="3" Height="16" Fill="{StaticResource AldrenBrandBrush}" RadiusX="1.5" RadiusY="1.5" />
+                        </StackPanel>
+                        <FontIcon
+                            x:Name="Glyph"
+                            FontSize="17"
+                            Visibility="Collapsed" />
+                    </Grid>
+
+                    <TextBlock
+                        x:Name="Caption"
+                        Grid.Column="1"
+                        Margin="0,14,4,14"
+                        VerticalAlignment="Top"
+                        FontFamily="Segoe UI Variable Text"
+                        FontSize="15"
+                        Foreground="{StaticResource IslandText}"
+                        LineHeight="20"
+                        MaxLines="9"
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="Wrap"
+                        Visibility="Collapsed" />
+
+                    <TextBox
+                        x:Name="Input"
+                        Grid.Column="1"
+                        Margin="0,14,0,14"
+                        VerticalAlignment="Top"
+                        AcceptsReturn="False"
+                        AutomationProperties.Name="Message to ALDREN"
+                        MaxHeight="100"
+                        MaxLength="4000"
+                        PlaceholderText="Ask ALDREN anything"
+                        PreviewKeyDown="OnInputPreviewKeyDown"
+                        Style="{StaticResource IslandInputStyle}"
+                        TextChanged="OnInputTextChanged"
+                        TextWrapping="Wrap"
+                        Visibility="Collapsed" />
+
+                    <StackPanel
+                        Grid.Column="2"
+                        Margin="0,9,0,0"
+                        VerticalAlignment="Top"
+                        Orientation="Horizontal"
+                        Spacing="6">
+                        <Border
+                            x:Name="EscHint"
+                            Margin="0,0,5,0"
+                            Padding="6,1,6,2"
+                            VerticalAlignment="Center"
+                            BorderBrush="#33FFFFFF"
+                            BorderThickness="1"
+                            CornerRadius="5"
+                            Visibility="Collapsed">
+                            <TextBlock FontSize="11" Foreground="{StaticResource IslandTextTertiary}" Text="esc" />
+                        </Border>
+                        <Button
+                            x:Name="SendButton"
+                            Width="30"
+                            Height="30"
+                            AutomationProperties.Name="Send"
+                            Click="OnSendClick"
+                            CornerRadius="15"
+                            Style="{StaticResource AldrenBrandRoundButtonStyle}"
+                            ToolTipService.ToolTip="Send (Enter)"
+                            Visibility="Collapsed">
+                            <FontIcon FontSize="13" FontWeight="Bold" Glyph="&#xE74A;" />
+                        </Button>
+                        <Button
+                            x:Name="StopButton"
+                            AutomationProperties.Name="Stop speaking"
+                            Click="OnStopClick"
+                            Style="{StaticResource IslandQuietRoundButtonStyle}"
+                            ToolTipService.ToolTip="Stop (Esc)"
+                            Visibility="Collapsed">
+                            <FontIcon FontSize="11" Glyph="&#xE71A;" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <!-- The answer to what you typed, under the field; the field stays where it is for a follow-up. -->
+                <Grid x:Name="AnswerPane" Grid.Row="1" Visibility="Collapsed">
+                    <Rectangle Height="1" Margin="14,0" VerticalAlignment="Top" Fill="{StaticResource IslandHairline}" />
+                    <ScrollViewer
+                        x:Name="AnswerScroll"
+                        MaxHeight="264"
+                        Padding="18,12,18,12"
+                        HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollBarVisibility="Auto">
+                        <TextBlock
+                            x:Name="AnswerText"
+                            FontFamily="Segoe UI Variable Text"
+                            FontSize="15"
+                            Foreground="{StaticResource IslandText}"
+                            IsTextSelectionEnabled="True"
+                            LineHeight="21"
+                            TextWrapping="Wrap" />
+                    </ScrollViewer>
+                </Grid>
+
+                <TextBlock
+                    x:Name="Footer"
+                    Grid.Row="2"
+                    Margin="18,0,18,11"
+                    FontSize="12"
+                    Foreground="{StaticResource IslandTextTertiary}"
+                    TextTrimming="CharacterEllipsis"
+                    Visibility="Collapsed" />
+
+                <!-- "Allow this?" replaces everything else until you answer. -->
+                <Grid
+                    x:Name="ConfirmPanel"
+                    Grid.RowSpan="3"
+                    Width="520"
+                    Padding="20,16,20,0"
+                    RowSpacing="10"
+                    Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon VerticalAlignment="Center" FontSize="18" Foreground="{StaticResource AldrenBrandBrush}" Glyph="&#xEA18;" />
+                        <TextBlock
+                            x:Name="ConfirmTitle"
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            FontSize="15"
+                            FontWeight="SemiBold"
+                            Foreground="{StaticResource IslandText}"
+                            Text="Allow this?" />
+                        <Border
+                            x:Name="ConfirmTierChip"
+                            Grid.Column="2"
+                            Padding="9,2,9,3"
+                            VerticalAlignment="Center"
+                            Background="#24FFFFFF"
+                            CornerRadius="10">
+                            <TextBlock x:Name="ConfirmTier" FontSize="12" Foreground="{StaticResource IslandText}" />
+                        </Border>
+                    </Grid>
+                    <TextBlock
+                        x:Name="ConfirmSummary"
+                        Grid.Row="1"
+                        FontSize="15"
+                        Foreground="{StaticResource IslandText}"
+                        LineHeight="21"
+                        MaxLines="6"
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="Wrap" />
+                    <TextBlock
+                        x:Name="ConfirmSources"
+                        Grid.Row="2"
+                        FontSize="13"
+                        Foreground="#FFFFC864"
+                        TextWrapping="Wrap"
+                        Visibility="Collapsed" />
+                    <Grid Grid.Row="3" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            x:Name="ConfirmDetail"
+                            VerticalAlignment="Center"
+                            FontSize="12"
+                            Foreground="{StaticResource IslandTextTertiary}"
+                            TextTrimming="CharacterEllipsis" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                            <Button
+                                x:Name="NoButton"
+                                MinWidth="92"
+                                AutomationProperties.Name="No"
+                                Click="OnNoClick"
+                                Content="No  (N)"
+                                CornerRadius="16" />
+                            <Button
+                                x:Name="YesButton"
+                                MinWidth="92"
+                                AutomationProperties.Name="Yes"
+                                Background="{StaticResource AldrenBrandBrush}"
+                                Click="OnYesClick"
+                                Content="Yes  (Y)"
+                                CornerRadius="16"
+                                Foreground="{StaticResource AldrenOnBrandBrush}">
+                                <Button.Resources>
+                                    <StaticResource x:Key="ButtonBackgroundPointerOver" ResourceKey="AldrenBrandBrushLight" />
+                                    <StaticResource x:Key="ButtonBackgroundPressed" ResourceKey="AldrenBrandBrushDark" />
+                                    <StaticResource x:Key="ButtonForegroundPointerOver" ResourceKey="AldrenOnBrandBrush" />
+                                    <StaticResource x:Key="ButtonForegroundPressed" ResourceKey="AldrenOnBrandBrush" />
+                                </Button.Resources>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                    <!-- Runs down while the prompt waits; at the end the answer is No. -->
+                    <Rectangle
+                        x:Name="ConfirmTimer"
+                        Grid.Row="4"
+                        Height="2"
+                        Margin="-20,4,-20,0"
+                        Fill="{StaticResource AldrenBrandBrush}" />
+                </Grid>
+            </Grid>
         </Grid>
     </Grid>
 </Window>

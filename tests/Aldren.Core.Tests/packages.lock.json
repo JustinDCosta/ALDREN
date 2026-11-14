@@ -82,6 +82,50 @@
           "Interop.UIAutomationClient": "10.19041.0"
         }
       },
+      "Google.Apis": {
+        "type": "Transitive",
+        "resolved": "1.78.0",
+        "contentHash": "pKMYqVircLwkdWwTIkNlwJ8FlUNuG9ZqkmnyJ03vJ51j/Ph59+C/Cp4XWLj0NeeTH6LmLaScweJ3kw+kjZ+clg==",
+        "dependencies": {
+          "Google.Apis.Core": "1.78.0"
+        }
+      },
+      "Google.Apis.Auth": {
+        "type": "Transitive",
+        "resolved": "1.78.0",
+        "contentHash": "C+Jzd1tTqZ3/2wVi5Tlkcvqt/+o67/JHvXSZCy89CfhSRwL5bm1HsKbk1KM0sBKGc/RKC8Pr/FsG6n6OZO/MFA==",
+        "dependencies": {
+          "Google.Apis": "1.78.0",
+          "Google.Apis.Core": "1.78.0",
+          "System.Management": "7.0.2"
+        }
+      },
+      "Google.Apis.Calendar.v3": {
+        "type": "Transitive",
+        "resolved": "1.78.0.4285",
+        "contentHash": "6OzXfEYUzZz74wUPufVoGw3YVUaoO4VS7oKoEJxvvPk6ITR6Oofn2VtPMv5t94ScnVhJj28vE9VIPHv7VoOqug==",
+        "dependencies": {
+          "Google.Apis": "1.78.0",
+          "Google.Apis.Auth": "1.78.0"
+        }
+      },
+      "Google.Apis.Core": {
+        "type": "Transitive",
+        "resolved": "1.78.0",
+        "contentHash": "rkiq62czYwim6XtS4GEI80zQMOHZbB8UqP3oeFcjvj8x5bUmdWagcT7oHQeQhMR1eq9tbmpvYvNy490iDvk6bQ==",
+        "dependencies": {
+          "Newtonsoft.Json": "13.0.4"
+        }
+      },
+      "Google.Apis.Drive.v3": {
+        "type": "Transitive",
+        "resolved": "1.78.0.4313",
+        "contentHash": "aQ6ZvjFdEKQHCxS0Afk84jFU2ZW1q1USvHRb+IwGvOrS86CZGpPCB3L/Xj7CxkBGfH6otHsegh+PQW//puys6g==",
+        "dependencies": {
+          "Google.Apis": "1.78.0",
+          "Google.Apis.Auth": "1.78.0"
+        }
+      },
       "Interop.UIAutomationClient": {
         "type": "Transitive",
         "resolved": "10.19041.0",
@@ -748,6 +792,11 @@
         "resolved": "8.0.0",
         "contentHash": "Obg3a90MkOw9mYKxrardLpY2u0axDMrSmy4JCdq2cYbelM2cUwmUir5Bomvd1yxmPL9h5LVHU1tuKBZpUjfASg=="
       },
+      "Velopack": {
+        "type": "Transitive",
+        "resolved": "1.2.161",
+        "contentHash": "OpHNacIumnkhaaX3ZlQ/TCR4YPOJvud2/PAOoWb6o+mIrLwIVA275I5wAgt4q/1O2VrJeDwR1qFQyqzG4lUArg=="
+      },
       "xunit.abstractions": {
         "type": "Transitive",
         "resolved": "2.0.3",
@@ -795,6 +844,9 @@
           "Microsoft.Extensions.Hosting": "[10.0.14, )"
         }
       },
+      "aldren.browser": {
+        "type": "Project"
+      },
       "aldren.cloud": {
         "type": "Project",
         "dependencies": {
@@ -823,8 +875,10 @@
         "type": "Project",
         "dependencies": {
           "Aldren.Assistant": "[1.0.0, )",
+          "Aldren.Browser": "[1.0.0, )",
           "Aldren.Cloud": "[1.0.0, )",
           "Aldren.Inference": "[1.0.0, )",
+          "Aldren.Integrations.Google": "[1.0.0, )",
           "Aldren.Memory": "[1.0.0, )",
           "Aldren.Perception": "[1.0.0, )",
           "Aldren.Presence": "[1.0.0, )",
@@ -833,13 +887,22 @@
           "Aldren.Voice": "[1.0.0, )",
           "Aldren.Windows": "[1.0.0, )",
           "Microsoft.Extensions.Hosting": "[10.0.14, )",
-          "Microsoft.Win32.SystemEvents": "[10.0.14, )"
+          "Microsoft.Win32.SystemEvents": "[10.0.14, )",
+          "Velopack": "[1.2.161, )"
         }
       },
       "aldren.inference": {
         "type": "Project",
         "dependencies": {
           "Microsoft.Extensions.Hosting": "[10.0.14, )"
+        }
+      },
+      "aldren.integrations.google": {
+        "type": "Project",
+        "dependencies": {
+          "Aldren.Security": "[1.0.0, )",
+          "Google.Apis.Calendar.v3": "[1.78.0.4285, )",
+          "Google.Apis.Drive.v3": "[1.78.0.4313, )"
         }
       },
       "aldren.memory": {

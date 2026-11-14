@@ -7,40 +7,67 @@ using Microsoft.UI.Composition;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.Graphics;
-using VirtualKey = Windows.System.VirtualKey;
 using Windows.UI;
+using VirtualKey = Windows.System.VirtualKey;
 
 namespace Aldren.App.Island;
 
 /// <summary>
-/// The island, ported from the S2 spike: a pre-created, hidden, topmost window that never takes focus unless you type
-/// or confirm, is click-through outside the pill, and is hidden from screen capture unless "Show ALDREN on stream" is on.
+/// The island: a pre-created, hidden, topmost window that never takes focus unless you type or confirm, is click-through
+/// outside the pill, and is hidden from screen capture unless "Show ALDREN on stream" is on.
+/// The pill is one shape that hugs whatever it holds: XAML lays the content out, and the Composition shape (with its
+/// shadow and the content's clip) springs to the content's size, so every change of state is a single smooth morph.
 /// </summary>
 public sealed partial class IslandWindow : Window
 {
-    // The window is a fixed canvas in DIPs; the pill animates inside it, so the window never resizes mid-morph.
-    public const int CanvasWidth = 600, CanvasHeight = 260;
-    public const float PillTop = 8;
+    // The window is a fixed, transparent canvas in DIPs; the pill animates inside it, so the window never resizes.
+    public const int CanvasWidth = 660, CanvasHeight = 480;
+    public const float PillTop = 10;
 
-    public static readonly TimeSpan IdleCollapse = TimeSpan.FromSeconds(8);
+    private const double TypingWidth = 520;
+    private const float MaxRadius = 26;
+    private static readonly TimeSpan EmptyFieldIdle = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan TypedFieldIdle = TimeSpan.FromMinutes(2);
+
+    private enum Sign
+    {
+        Mark,
+        Spinner,
+        Listening,
+        Speaking,
+        Glyph,
+    }
 
     private readonly nint _hwnd;
     private readonly WindowStyles.SubclassProc _wndProc; // held so the GC never collects the native callbacks
     private readonly DispatcherQueueTimer _cursorTimer;
     private readonly DispatcherQueueTimer _idleTimer;
+    private readonly DispatcherQueueTimer _confirmTimer;
     private readonly Compositor _compositor;
+    private readonly Visual _rootVisual;
     private readonly CompositionRoundedRectangleGeometry _pill;
     private readonly Windows.UI.ViewManagement.UISettings _uiSettings = new();
     private readonly ILogger _log;
+    private readonly List<string> _history = [];
+    private readonly SolidColorBrush _text;
+    private readonly SolidColorBrush _textSecondary;
+    private int _historyIndex = -1;
     private int _morphId;
     private bool _visible;
+    private bool _hiding;
     private bool _interactive;
+    private bool _busy;
+    private bool _voiceTurn;
     private bool? _lastWanted;
     private nint _previousForeground;
+    private Vector2 _target;
+    private string? _voiceReply;
+    private DateTimeOffset _confirmDeadline;
     private TaskCompletionSource<bool>? _confirmation;
 
     public IslandWindow(ILogger log)
@@ -48,6 +75,8 @@ public sealed partial class IslandWindow : Window
         _log = log;
         InitializeComponent();
         _hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        _text = (SolidColorBrush)Root.Resources["IslandText"];
+        _textSecondary = (SolidColorBrush)Root.Resources["IslandTextSecondary"];
 
         SystemBackdrop = new TransparentBackdrop();
         var presenter = OverlappedPresenter.Create();
@@ -65,30 +94,14 @@ public sealed partial class IslandWindow : Window
         TransparentBackdrop.ConfigureDwm(_hwnd);
         SetShowOnStream(false);
 
-        _compositor = ElementCompositionPreview.GetElementVisual(PillHost).Compositor;
+        _rootVisual = ElementCompositionPreview.GetElementVisual(Root);
+        _compositor = _rootVisual.Compositor;
         _pill = _compositor.CreateRoundedRectangleGeometry();
-        var shape = _compositor.CreateSpriteShape(_pill);
-        shape.FillBrush = _compositor.CreateColorBrush(Color.FromArgb(255, 15, 15, 15));
-        shape.StrokeBrush = _compositor.CreateColorBrush(Color.FromArgb(40, 255, 255, 255));
-        shape.StrokeThickness = 1;
-        var visual = _compositor.CreateShapeVisual();
-        visual.Size = new Vector2(CanvasWidth, CanvasHeight);
-        visual.Shapes.Add(shape);
-        ElementCompositionPreview.SetElementChildVisual(PillHost, visual);
+        BuildPill();
 
-        // Keeps the pill horizontally centred while its size springs.
-        var centre = _compositor.CreateExpressionAnimation("Vector2((width - pill.Size.X) / 2, top)");
-        centre.SetScalarParameter("width", CanvasWidth);
-        centre.SetScalarParameter("top", PillTop);
-        centre.SetReferenceParameter("pill", _pill);
-        _pill.StartAnimation("Offset", centre);
-
-        // handledEventsToo: the reply text is selectable and consumes the press itself, so a plain PointerPressed
-        // handler never saw clicks on the text, which is exactly where "click to read it all" is.
+        // handledEventsToo: a press on the reply text would otherwise never reach this handler.
         Root.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(OnRootPointerPressed), handledEventsToo: true);
-
-        Panel.OpacityTransition = new ScalarTransition { Duration = TimeSpan.FromMilliseconds(120) };
-        Panel.Opacity = 0;
+        Caption.IsTextTrimmedChanged += (_, _) => UpdateVoiceFooter();
 
         // Runs only while the island is visible: hidden means nothing ticks.
         _cursorTimer = DispatcherQueue.CreateTimer();
@@ -96,20 +109,24 @@ public sealed partial class IslandWindow : Window
         _cursorTimer.Tick += (_, _) => UpdateClickThrough();
 
         _idleTimer = DispatcherQueue.CreateTimer();
-        _idleTimer.Interval = IdleCollapse;
         _idleTimer.IsRepeating = false;
         _idleTimer.Tick += (_, _) =>
         {
-            if (State is not IslandState.Confirm and not IslandState.Hidden)
+            if (State is not IslandState.Confirm and not IslandState.Hidden && !_busy)
             {
                 Dismiss();
             }
         };
 
+        _confirmTimer = DispatcherQueue.CreateTimer();
+        _confirmTimer.Interval = TimeSpan.FromSeconds(1);
+        _confirmTimer.Tick += (_, _) => UpdateConfirmDetail();
+
         Activated += (_, e) =>
         {
-            // Clicking elsewhere while typing closes the island; a confirmation stays until answered.
-            if (e.WindowActivationState == WindowActivationState.Deactivated && State is IslandState.Text or IslandState.Reply)
+            // Clicking elsewhere while typing closes the island (a request already sent still gets its answer shown);
+            // a confirmation stays until answered.
+            if (e.WindowActivationState == WindowActivationState.Deactivated && _interactive && State is IslandState.Text or IslandState.Reply)
             {
                 Dismiss(restoreFocus: false);
             }
@@ -123,72 +140,233 @@ public sealed partial class IslandWindow : Window
 
     public event Action? ExpandRequested;
 
+    /// <summary>The Stop button: ALDREN goes quiet and the voice turn ends.</summary>
+    public event Action? StopRequested;
+
     public void SetShowOnStream(bool show) => WindowStyles.SetCaptureExcluded(_hwnd, !show);
 
-    /// <summary>The hotkey: opens the text box on the monitor you're working on, or closes it.</summary>
+    // ------------------------------------------------------------------ typing
+
+    /// <summary>The hotkey: opens the text field on the monitor you're working on, or closes it.</summary>
     public void ToggleText()
     {
-        if (State is IslandState.Text or IslandState.Reply)
+        if (State == IslandState.Confirm)
+        {
+            return;
+        }
+
+        if (_interactive && State is IslandState.Text or IslandState.Reply)
         {
             Dismiss();
             return;
         }
 
-        if (State == IslandState.Confirm)
+        RememberForeground();
+        ShowField(placeholder: "Ask ALDREN anything", answer: null);
+        if (_busy)
         {
-            return;
+            // Reopened while the last request is still running: its answer lands here.
+            Input.IsReadOnly = true;
+            Input.PlaceholderText = "Working on your last request…";
+            SetSign(Sign.Spinner);
         }
 
-        Open(IslandState.Text);
-        Caption.Text = "";
-        Input.Text = "";
-        Input.Visibility = Visibility.Visible;
-        ConfirmPanel.Visibility = Visibility.Collapsed;
-        StopButton.Visibility = Visibility.Collapsed;
+        Arrange(IslandState.Text);
+        SetInteractive(true);
         Input.Focus(FocusState.Programmatic);
-        RestartIdle();
+        RestartIdle(EmptyFieldIdle);
     }
 
-    public Task<bool> ConfirmAsync(ConfirmationRequest request, CancellationToken ct)
+    /// <summary>The reply to the typed request in flight, as far as the model has written it.</summary>
+    public void ShowTypedProgress(string text)
     {
-        _confirmation?.TrySetResult(false);
-        var answer = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _confirmation = answer;
-
-        Open(IslandState.Confirm);
-        _idleTimer.Stop();
-        Caption.Text = "";
-        Input.Visibility = Visibility.Collapsed;
-        ConfirmPanel.Visibility = Visibility.Visible;
-        StopButton.Visibility = Visibility.Collapsed;
-        ConfirmSummary.Text = request.Summary;
-        ConfirmTier.Text = $"Risk: {request.Tier} · {request.Tool} · declined automatically after {request.TimeoutSeconds} s";
-        ConfirmSources.Visibility = request.UntrustedSources.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        ConfirmSources.Text = $"Suggested while reading {string.Join(", ", request.UntrustedSources)}";
-        NoButton.Focus(FocusState.Programmatic);
-
-        var registration = ct.Register(() => DispatcherQueue.TryEnqueue(() => Answer(answer, false)));
-        answer.Task.ContinueWith(_ => registration.Dispose(), TaskScheduler.Default);
-        return answer.Task;
-    }
-
-    /// <summary>Shows a state with sample content, for Diagnostics.</summary>
-    public void Preview(IslandState state)
-    {
-        if (State == IslandState.Confirm)
+        if (!_busy || !_interactive || State is not (IslandState.Text or IslandState.Reply) || text.Length == 0)
         {
             return;
         }
 
-        PlaceOnForegroundMonitor();
-        SetInteractive(false);
-        Input.Visibility = Visibility.Collapsed;
-        ConfirmPanel.Visibility = Visibility.Collapsed;
-        StopButton.Visibility = Visibility.Collapsed;
-        Caption.Text = IslandShapes.Sample(state);
-        SetState(state);
-        RestartIdle();
+        AnswerText.Text = text;
+        AnswerText.Opacity = 1;
+        AnswerPane.Visibility = Visibility.Visible;
     }
+
+    /// <summary>
+    /// Gives keyboard focus back to the window you were in, before ALDREN types or clicks there for you. The island stays
+    /// up without focus; the answer still shows in it.
+    /// </summary>
+    public void YieldFocus()
+    {
+        if (!_interactive || State == IslandState.Confirm)
+        {
+            return;
+        }
+
+        var previous = _previousForeground;
+        _previousForeground = 0;
+        SetInteractive(false);
+        if (previous != 0 && Focus.IsWindow(previous))
+        {
+            Focus.SetForegroundWindow(previous);
+        }
+    }
+
+    private void ShowField(string placeholder, string? answer)
+    {
+        ConfirmPanel.Visibility = Visibility.Collapsed;
+        Line.Visibility = Visibility.Visible;
+        Caption.Visibility = Visibility.Collapsed;
+        StopButton.Visibility = Visibility.Collapsed;
+        Input.Visibility = Visibility.Visible;
+        Input.IsReadOnly = false;
+        Input.Foreground = _text;
+        Input.PlaceholderText = placeholder;
+        Input.Text = "";
+        SetSign(Sign.Mark);
+        if (answer is null)
+        {
+            AnswerPane.Visibility = Visibility.Collapsed;
+            Footer.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            AnswerText.Text = answer;
+            AnswerText.Opacity = 1;
+            AnswerPane.Visibility = Visibility.Visible;
+            AnswerScroll.ChangeView(null, 0, null, disableAnimation: true);
+            Footer.Text = "Enter sends  ·  Ctrl+Enter opens the conversation  ·  Esc closes";
+            Footer.Visibility = Visibility.Visible;
+        }
+
+        UpdateFieldActions();
+    }
+
+    /// <summary>Right of the field: "esc" while it's empty, the send button once there is something to send.</summary>
+    private void UpdateFieldActions()
+    {
+        var typing = Input.Visibility == Visibility.Visible && !_busy;
+        var hasText = Input.Text.Trim().Length > 0;
+        SendButton.Visibility = typing && hasText ? Visibility.Visible : Visibility.Collapsed;
+        EscHint.Visibility = typing && !hasText ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnInputTextChanged(object sender, TextChangedEventArgs e)
+    {
+        UpdateFieldActions();
+        if (!_busy && State is IslandState.Text or IslandState.Reply)
+        {
+            RestartIdle(Input.Text.Length > 0 ? TypedFieldIdle : EmptyFieldIdle);
+        }
+    }
+
+    private void OnInputPreviewKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case VirtualKey.Enter:
+                e.Handled = true;
+                if (Down(VirtualKey.Control))
+                {
+                    Dismiss(restoreFocus: false);
+                    ExpandRequested?.Invoke();
+                }
+                else
+                {
+                    _ = SendAsync(Input.Text.Trim());
+                }
+
+                break;
+            case VirtualKey.Up when !_busy && _history.Count > 0 && (Input.Text.Length == 0 || _historyIndex >= 0):
+                e.Handled = true;
+                _historyIndex = _historyIndex < 0 ? _history.Count - 1 : Math.Max(0, _historyIndex - 1);
+                Recall();
+                break;
+            case VirtualKey.Down when !_busy && _historyIndex >= 0:
+                e.Handled = true;
+                _historyIndex++;
+                if (_historyIndex >= _history.Count)
+                {
+                    _historyIndex = -1;
+                    Input.Text = "";
+                }
+                else
+                {
+                    Recall();
+                }
+
+                break;
+        }
+
+        void Recall()
+        {
+            Input.Text = _history[_historyIndex];
+            Input.SelectionStart = Input.Text.Length;
+        }
+    }
+
+    private static bool Down(VirtualKey key) =>
+        Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(key).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
+
+    private void OnSendClick(object sender, RoutedEventArgs e) => _ = SendAsync(Input.Text.Trim());
+
+    private async Task SendAsync(string text)
+    {
+        if (text.Length == 0 || Submit is null || _busy)
+        {
+            return;
+        }
+
+        if (_history.Count == 0 || _history[^1] != text)
+        {
+            _history.Add(text);
+            if (_history.Count > 30)
+            {
+                _history.RemoveAt(0);
+            }
+        }
+
+        _historyIndex = -1;
+        _busy = true;
+        // The question stays in the field, dimmed, while ALDREN works on it.
+        Input.IsReadOnly = true;
+        Input.Foreground = _textSecondary;
+        AnswerText.Opacity = 0.45;
+        SetSign(Sign.Spinner);
+        UpdateFieldActions();
+        _idleTimer.Stop();
+
+        string reply;
+        try
+        {
+            reply = await Submit(text);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning("Submitting text failed: {Message}", ex.Message);
+            reply = "Something went wrong: " + ex.Message;
+        }
+
+        _busy = false;
+        if (State == IslandState.Confirm)
+        {
+            return; // the conversation window has the reply
+        }
+
+        if (_interactive && State is IslandState.Text or IslandState.Reply)
+        {
+            ShowField(placeholder: "Ask a follow-up", answer: reply);
+            Arrange(IslandState.Reply);
+            Input.Focus(FocusState.Programmatic);
+            RestartIdle(ReadingTime(reply));
+        }
+        else if (State is IslandState.Hidden or IslandState.Text or IslandState.Reply)
+        {
+            // You clicked back into your work (or ALDREN handed focus back to act there): the answer still shows.
+            ShowPassive(IslandState.Reply, Sign.Mark, reply, secondary: false);
+            RestartIdle(ReadingTime(reply));
+        }
+    }
+
+    // ------------------------------------------------------------------ voice, cloud, previews
 
     /// <summary>The voice loop's live state, without taking focus: you keep typing in your app while ALDREN listens.</summary>
     public void ShowVoice(VoiceState state, string text)
@@ -200,69 +378,64 @@ public sealed partial class IslandWindow : Window
 
         if (state == VoiceState.Idle)
         {
-            if (State is IslandState.Listening or IslandState.Transcribing or IslandState.Thinking or IslandState.Speaking or IslandState.Reply)
+            if (_voiceTurn)
             {
+                _voiceTurn = false;
+                _voiceReply = null;
                 Dismiss(restoreFocus: false);
             }
 
             return;
         }
 
-        if (State is IslandState.Hidden)
+        _voiceTurn = true;
+        switch (state)
         {
-            PlaceOnForegroundMonitor();
+            case VoiceState.Listening when _voiceReply is { } reply:
+                // The follow-up window keeps the reply on screen instead of replacing it with "Anything else?".
+                ShowPassive(IslandState.Listening, Sign.Listening, reply, secondary: false, footer: "Listening for a follow-up…");
+                break;
+            case VoiceState.Listening:
+                ShowPassive(IslandState.Listening, Sign.Listening, text, secondary: true);
+                break;
+            case VoiceState.Transcribing:
+                _voiceReply = null;
+                ShowPassive(IslandState.Transcribing, Sign.Spinner, text.Trim('…', ' ').Length == 0 ? "Got it…" : text, secondary: true);
+                break;
+            case VoiceState.Thinking:
+                _voiceReply = null;
+                ShowPassive(IslandState.Thinking, Sign.Spinner, text, secondary: true);
+                break;
+            case VoiceState.Speaking:
+                _voiceReply = text;
+                ShowPassive(IslandState.Speaking, Sign.Speaking, text, secondary: false, stop: true);
+                UpdateVoiceFooter();
+                break;
+            default:
+                ShowPassive(IslandState.Error, Sign.Glyph, text, secondary: false, glyph: "", glyphColor: Color.FromArgb(255, 255, 153, 102));
+                RestartIdle(ReadingTime(text));
+                return;
         }
 
-        SetInteractive(false);
-        Input.Visibility = Visibility.Collapsed;
-        ConfirmPanel.Visibility = Visibility.Collapsed;
-        var island = state switch
-        {
-            VoiceState.Listening => IslandState.Listening,
-            VoiceState.Transcribing => IslandState.Transcribing,
-            VoiceState.Thinking => IslandState.Thinking,
-            VoiceState.Speaking => text.Length > 90 ? IslandState.Reply : IslandState.Speaking,
-            _ => IslandState.Error,
-        };
+        // Every voice state stays up until Core sends the next one (the turn always ends with Idle).
+        _idleTimer.Stop();
+    }
 
-        if (state == VoiceState.Speaking)
+    /// <summary>A long spoken reply is cut after nine lines: say where the rest is.</summary>
+    private void UpdateVoiceFooter()
+    {
+        if (State != IslandState.Speaking)
         {
-            _lastReply = text;
+            return;
         }
 
-        // The Stop button shows exactly while ALDREN speaks.
-        StopButton.Visibility = state == VoiceState.Speaking ? Visibility.Visible : Visibility.Collapsed;
-
-        if (island == IslandState.Reply)
-        {
-            Caption.Text = ReplyCaption(text, footer: "Click here to see the full reply.");
-        }
-        else if (state == VoiceState.Listening && State == IslandState.Reply && _lastReply is { } reply)
-        {
-            // The follow-up window keeps a long reply on screen instead of replacing it with "Anything else?".
-            island = IslandState.Reply;
-            Caption.Text = ReplyCaption(reply, footer: "Listening for a follow-up… Click here to see the full reply.");
-        }
-        else
-        {
-            Caption.Text = text;
-        }
-        SetState(island);
-        // Every voice state stays up until Core sends the next one (the turn always ends with Idle), however long ALDREN
-        // speaks; only an error collapses on its own.
-        if (state is VoiceState.Error)
-        {
-            RestartIdle();
-        }
-        else
-        {
-            _idleTimer.Stop();
-        }
+        Footer.Text = "Click to read the full reply";
+        Footer.Visibility = Caption.IsTextTrimmed ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>
-    /// The cloud indicator in the island: "researching" while something is online. Left alone while you type or confirm;
-    /// the tray tooltip still says it then.
+    /// The cloud indicator in the island: what is going online right now. Left alone while you type or confirm; the tray
+    /// tooltip still says it then.
     /// </summary>
     public void ShowCloud(string? activity)
     {
@@ -281,27 +454,75 @@ public sealed partial class IslandWindow : Window
             return;
         }
 
-        if (State == IslandState.Hidden)
+        ShowPassive(IslandState.Researching, Sign.Glyph, $"{activity}…", secondary: false, glyph: "", footer: "Online");
+        _idleTimer.Stop();
+    }
+
+    /// <summary>Shows a state with sample content, for Diagnostics.</summary>
+    public void Preview(IslandState state)
+    {
+        if (State == IslandState.Confirm)
+        {
+            return;
+        }
+
+        var sample = IslandSamples.For(state);
+        switch (state)
+        {
+            case IslandState.Listening:
+                ShowPassive(state, Sign.Listening, sample, secondary: true);
+                break;
+            case IslandState.Transcribing or IslandState.Thinking or IslandState.Acting:
+                ShowPassive(state, Sign.Spinner, sample, secondary: state != IslandState.Acting);
+                break;
+            case IslandState.Researching:
+                ShowPassive(state, Sign.Glyph, sample, secondary: false, glyph: "", footer: "Online");
+                break;
+            case IslandState.Speaking:
+                ShowPassive(state, Sign.Speaking, sample, secondary: false, stop: true);
+                break;
+            case IslandState.Reply:
+                ShowPassive(state, Sign.Mark, sample, secondary: false);
+                break;
+            case IslandState.Error:
+                ShowPassive(state, Sign.Glyph, sample, secondary: false, glyph: "", glyphColor: Color.FromArgb(255, 255, 153, 102));
+                break;
+            default:
+                ShowPassive(state, Sign.Mark, sample, secondary: false);
+                break;
+        }
+
+        RestartIdle(TimeSpan.FromSeconds(8));
+    }
+
+    /// <summary>A line of text with its sign, shown without taking focus; a click on it opens the conversation.</summary>
+    private void ShowPassive(
+        IslandState state, Sign sign, string caption, bool secondary, bool stop = false, string? footer = null,
+        string? glyph = null, Color? glyphColor = null)
+    {
+        if (!_visible || _hiding)
         {
             PlaceOnForegroundMonitor();
         }
 
         SetInteractive(false);
-        Input.Visibility = Visibility.Collapsed;
         ConfirmPanel.Visibility = Visibility.Collapsed;
-        StopButton.Visibility = Visibility.Collapsed;
-        Caption.Text = $"🌐 {activity}…";
-        SetState(IslandState.Researching);
-        _idleTimer.Stop();
+        Line.Visibility = Visibility.Visible;
+        Input.Visibility = Visibility.Collapsed;
+        AnswerPane.Visibility = Visibility.Collapsed;
+        SendButton.Visibility = Visibility.Collapsed;
+        EscHint.Visibility = Visibility.Collapsed;
+        StopButton.Visibility = stop ? Visibility.Visible : Visibility.Collapsed;
+        Caption.Text = caption;
+        Caption.Foreground = secondary ? _textSecondary : _text;
+        // With nothing to press on the right, the text gets the pill's own margin there.
+        Caption.Margin = new Thickness(0, 14, stop ? 0 : 9, 14);
+        Caption.Visibility = Visibility.Visible;
+        Footer.Text = footer ?? "";
+        Footer.Visibility = footer is null ? Visibility.Collapsed : Visibility.Visible;
+        SetSign(sign, glyph, glyphColor);
+        Arrange(state);
     }
-
-    /// <summary>About what the reply-sized island holds at 14 px, leaving room for the footer line.</summary>
-    private const int LongReply = 380;
-
-    private string? _lastReply;
-
-    /// <summary>The Stop button: ALDREN goes quiet and the voice turn ends.</summary>
-    public event Action? StopRequested;
 
     private void OnStopClick(object sender, RoutedEventArgs e)
     {
@@ -310,19 +531,13 @@ public sealed partial class IslandWindow : Window
         StopRequested?.Invoke();
     }
 
-    private static string ReplyCaption(string reply, string footer) =>
-        (reply.Length > LongReply ? reply[..LongReply].TrimEnd() + "…" : reply) + "\n\n" + footer;
-
     /// <summary>
-    /// A click on the island while it shows a voice turn or a reply opens the conversation window with the whole text.
-    /// Clicks in the text box, and on a confirmation, keep their usual meaning.
+    /// A click on the island while it only shows something (a voice turn, an answer) opens the conversation window.
+    /// While you type or confirm, clicks keep their usual meaning.
     /// </summary>
     private void OnRootPointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        var opensConversation = State is IslandState.Reply or IslandState.Speaking or IslandState.Listening
-            or IslandState.Transcribing or IslandState.Thinking;
-        var source = e.OriginalSource as DependencyObject;
-        if (!opensConversation || IsInside(source, Input) || IsInside(source, StopButton))
+        if (_interactive || State is IslandState.Hidden or IslandState.Confirm || IsInside(e.OriginalSource as DependencyObject, StopButton))
         {
             return;
         }
@@ -344,41 +559,66 @@ public sealed partial class IslandWindow : Window
         return false;
     }
 
-    public void Dismiss(bool restoreFocus = true)
+    // ------------------------------------------------------------------ confirmations
+
+    public Task<bool> ConfirmAsync(ConfirmationRequest request, CancellationToken ct)
     {
+        _confirmation?.TrySetResult(false);
+        var answer = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _confirmation = answer;
+
+        RememberForeground();
         _idleTimer.Stop();
-        var previous = _previousForeground;
-        _previousForeground = 0;
-        SetInteractive(false);
-        SetState(IslandState.Hidden);
-        if (restoreFocus && previous != 0 && Focus.IsWindow(previous))
+        Line.Visibility = Visibility.Collapsed;
+        AnswerPane.Visibility = Visibility.Collapsed;
+        Footer.Visibility = Visibility.Collapsed;
+        ConfirmPanel.Visibility = Visibility.Visible;
+        ConfirmSummary.Text = request.Summary;
+        (ConfirmTier.Text, ConfirmTierChip.Background) = request.Tier switch
         {
-            Focus.SetForegroundWindow(previous);
-        }
-    }
-
-    private void Open(IslandState state)
-    {
-        if (!_interactive)
-        {
-            var foreground = Focus.GetForegroundWindow();
-            _previousForeground = foreground == _hwnd ? 0 : foreground;
-            PlaceOnForegroundMonitor();
-        }
-
-        SetState(state);
+            "Destructive" => ("Can't be undone", new SolidColorBrush(Color.FromArgb(70, 255, 99, 99))),
+            "Impactful" => ("Changes something", new SolidColorBrush(Color.FromArgb(60, 255, 190, 92))),
+            "Reversible" => ("Easy to undo", new SolidColorBrush(Color.FromArgb(36, 255, 255, 255))),
+            _ => (request.Tier, new SolidColorBrush(Color.FromArgb(36, 255, 255, 255))),
+        };
+        ConfirmSources.Visibility = request.UntrustedSources.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ConfirmSources.Text = $"Suggested while reading {string.Join(", ", request.UntrustedSources)}";
+        _confirmDeadline = DateTimeOffset.UtcNow.AddSeconds(request.TimeoutSeconds);
+        UpdateConfirmDetail();
+        _confirmTimer.Start();
+        Arrange(IslandState.Confirm);
+        RunConfirmTimerBar(TimeSpan.FromSeconds(request.TimeoutSeconds));
         SetInteractive(true);
+        NoButton.Focus(FocusState.Programmatic);
+
+        var registration = ct.Register(() => DispatcherQueue.TryEnqueue(() => Answer(answer, false)));
+        answer.Task.ContinueWith(_ => registration.Dispose(), TaskScheduler.Default);
+        return answer.Task;
     }
 
-    private void SetInteractive(bool on)
+    private void UpdateConfirmDetail()
     {
-        _interactive = on;
-        Focus.SetNoActivate(_hwnd, !on);
-        if (on)
+        var left = Math.Max(0, (int)Math.Ceiling((_confirmDeadline - DateTimeOffset.UtcNow).TotalSeconds));
+        ConfirmDetail.Text = $"Answers No by itself in {left} s";
+    }
+
+    /// <summary>The thin line under the prompt shrinks to nothing over the time you have to answer.</summary>
+    private void RunConfirmTimerBar(TimeSpan duration)
+    {
+        var bar = ElementCompositionPreview.GetElementVisual(ConfirmTimer);
+        bar.StopAnimation("Scale");
+        bar.CenterPoint = Vector3.Zero;
+        bar.Scale = Vector3.One;
+        if (!_uiSettings.AnimationsEnabled)
         {
-            Focus.SetForegroundWindow(_hwnd);
-            Activate();
+            return;
         }
+
+        var shrink = _compositor.CreateVector3KeyFrameAnimation();
+        shrink.InsertKeyFrame(0f, Vector3.One);
+        shrink.InsertKeyFrame(1f, new Vector3(0, 1, 1), _compositor.CreateLinearEasingFunction());
+        shrink.Duration = duration;
+        bar.StartAnimation("Scale", shrink);
     }
 
     private void Answer(TaskCompletionSource<bool> answer, bool yes)
@@ -391,6 +631,7 @@ public sealed partial class IslandWindow : Window
         if (ReferenceEquals(_confirmation, answer))
         {
             _confirmation = null;
+            _confirmTimer.Stop();
             ConfirmPanel.Visibility = Visibility.Collapsed;
             Dismiss();
         }
@@ -398,12 +639,18 @@ public sealed partial class IslandWindow : Window
 
     private void OnYesClick(object sender, RoutedEventArgs e)
     {
-        if (_confirmation is { } answer) Answer(answer, true);
+        if (_confirmation is { } answer)
+        {
+            Answer(answer, true);
+        }
     }
 
     private void OnNoClick(object sender, RoutedEventArgs e)
     {
-        if (_confirmation is { } answer) Answer(answer, false);
+        if (_confirmation is { } answer)
+        {
+            Answer(answer, false);
+        }
     }
 
     private void OnRootKeyDown(object sender, KeyRoutedEventArgs e)
@@ -429,124 +676,307 @@ public sealed partial class IslandWindow : Window
         }
     }
 
-    private void OnInputTextChanged(object sender, Microsoft.UI.Xaml.Controls.TextChangedEventArgs e) => RestartIdle();
+    // ------------------------------------------------------------------ showing, hiding, morphing
 
-    private void OnInputKeyDown(object sender, KeyRoutedEventArgs e)
-    {
-        RestartIdle();
-        if (e.Key != VirtualKey.Enter)
-        {
-            return;
-        }
-
-        e.Handled = true;
-        var ctrl = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control)
-            .HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
-        if (ctrl)
-        {
-            Dismiss(restoreFocus: false);
-            ExpandRequested?.Invoke();
-            return;
-        }
-
-        _ = SendAsync(Input.Text.Trim());
-    }
-
-    private async Task SendAsync(string text)
-    {
-        if (text.Length == 0 || Submit is null)
-        {
-            return;
-        }
-
-        Input.Text = "";
-        Caption.Text = "Thinking…";
-        _idleTimer.Stop();
-        string reply;
-        try
-        {
-            reply = await Submit(text);
-        }
-        catch (Exception ex)
-        {
-            _log.LogWarning("Submitting text failed: {Message}", ex.Message);
-            reply = "Something went wrong: " + ex.Message;
-        }
-
-        if (State is IslandState.Text or IslandState.Reply)
-        {
-            Caption.Text = reply;
-            SetState(IslandState.Reply);
-            Input.Focus(FocusState.Programmatic);
-            RestartIdle();
-        }
-    }
-
-    private void RestartIdle()
+    public void Dismiss(bool restoreFocus = true)
     {
         _idleTimer.Stop();
-        _idleTimer.Start();
+        var previous = _previousForeground;
+        _previousForeground = 0;
+        SetInteractive(false);
+        Hide();
+        if (restoreFocus && previous != 0 && Focus.IsWindow(previous))
+        {
+            Focus.SetForegroundWindow(previous);
+        }
     }
 
-    private void SetState(IslandState state)
+    /// <summary>Before taking focus: note the window you're in (to hand focus back) and move to its monitor.</summary>
+    private void RememberForeground()
+    {
+        if (_interactive)
+        {
+            return;
+        }
+
+        var foreground = Focus.GetForegroundWindow();
+        _previousForeground = foreground == _hwnd ? 0 : foreground;
+        PlaceOnForegroundMonitor();
+    }
+
+    private void SetInteractive(bool on)
+    {
+        if (_interactive == on)
+        {
+            return;
+        }
+
+        _interactive = on;
+        Focus.SetNoActivate(_hwnd, !on);
+        if (on)
+        {
+            Focus.SetForegroundWindow(_hwnd);
+            Activate();
+        }
+    }
+
+    /// <summary>The content is set: take the new state, and show the island if it isn't up.</summary>
+    private void Arrange(IslandState state)
     {
         State = state;
-        var (size, radius) = IslandShapes.For(state);
-        if (state != IslandState.Hidden && !_visible)
+        // The field has a fixed width; everything else is as wide as its text, up to the panel's maximum.
+        Panel.Width = Input.Visibility == Visibility.Visible ? TypingWidth : double.NaN;
+        if (!_visible)
         {
-            WindowStyles.ShowNoActivate(_hwnd);
-            _visible = true;
-            UpdateClickThrough();
-            _cursorTimer.Start();
+            Reveal();
+        }
+        else if (_hiding)
+        {
+            // Asked back while fading out: stay, at full opacity, and take the new content's size.
+            _hiding = false;
+            _morphId++;
+            Fade(to: 1, TimeSpan.FromMilliseconds(90));
+            Panel.UpdateLayout();
+            MorphTo(PanelSize());
+        }
+    }
+
+    private Vector2 PanelSize() =>
+        Panel.ActualWidth >= 1 && Panel.ActualHeight >= 1 ? new Vector2((float)Panel.ActualWidth, (float)Panel.ActualHeight) : new Vector2(260, 48);
+
+    private void Reveal()
+    {
+        Panel.UpdateLayout();
+        var size = PanelSize();
+        _morphId++;
+        _hiding = false;
+        _pill.StopAnimation("Size");
+        _pill.StopAnimation("CornerRadius");
+        _rootVisual.StopAnimation("Opacity");
+        if (_uiSettings.AnimationsEnabled)
+        {
+            // A small pop: starts a little smaller and transparent, springs to size while it fades in.
+            _pill.Size = new Vector2(size.X * 0.9f, Math.Max(24, size.Y * 0.86f));
+            _pill.CornerRadius = new Vector2(Math.Min(_pill.Size.Y / 2, MaxRadius));
+            _rootVisual.Opacity = 0;
         }
 
-        LayoutPanel(size, state);
+        WindowStyles.ShowNoActivate(_hwnd);
+        _visible = true;
+        MorphTo(size);
+        Fade(to: 1, TimeSpan.FromMilliseconds(140));
+        UpdateClickThrough();
+        _cursorTimer.Start();
+    }
+
+    private void Hide()
+    {
+        var was = State;
+        State = IslandState.Hidden;
+        StopSigns();
+        _confirmTimer.Stop();
         var id = ++_morphId;
+        if (!_visible || was == IslandState.Hidden && _hiding)
+        {
+            return;
+        }
+
+        if (!_uiSettings.AnimationsEnabled)
+        {
+            FinishHide(id);
+            return;
+        }
+
+        _hiding = true;
+        var batch = _compositor.CreateScopedBatch(CompositionBatchTypes.Animation);
+        Fade(to: 0, TimeSpan.FromMilliseconds(150));
+        batch.End();
+        batch.Completed += (_, _) => FinishHide(id);
+        // Outside the batch: a spring settles long after the fade is over.
+        _pill.StartAnimation("Size", Spring(new Vector2(_target.X * 0.9f, Math.Max(24, _target.Y * 0.86f))));
+    }
+
+    private void FinishHide(int id)
+    {
+        if (id != _morphId || State != IslandState.Hidden)
+        {
+            return; // asked back in the meantime
+        }
+
+        _cursorTimer.Stop();
+        WindowStyles.Hide(_hwnd);
+        _visible = false;
+        _hiding = false;
+        Input.Text = "";
+        AnswerText.Text = "";
+        Caption.Text = "";
+    }
+
+    private void Fade(float to, TimeSpan duration)
+    {
+        if (!_uiSettings.AnimationsEnabled)
+        {
+            _rootVisual.Opacity = to;
+            return;
+        }
+
+        var fade = _compositor.CreateScalarKeyFrameAnimation();
+        fade.InsertKeyFrame(1f, to, _compositor.CreateCubicBezierEasingFunction(new Vector2(0.2f, 0f), new Vector2(0f, 1f)));
+        fade.Duration = duration;
+        _rootVisual.StartAnimation("Opacity", fade);
+    }
+
+    private void OnPanelSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (_visible && !_hiding && State != IslandState.Hidden)
+        {
+            MorphTo(new Vector2((float)e.NewSize.Width, (float)e.NewSize.Height));
+        }
+    }
+
+    private void MorphTo(Vector2 size)
+    {
+        _target = size;
+        var radius = new Vector2(Math.Min(size.Y / 2, MaxRadius));
         if (!_uiSettings.AnimationsEnabled)
         {
             // Windows' "Animation effects" is off: no morphs.
             _pill.Size = size;
-            _pill.CornerRadius = new Vector2(radius);
-            Settle(id);
+            _pill.CornerRadius = radius;
             return;
         }
 
-        var batch = _compositor.CreateScopedBatch(CompositionBatchTypes.Animation);
         _pill.StartAnimation("Size", Spring(size));
-        _pill.StartAnimation("CornerRadius", Spring(new Vector2(radius)));
-        batch.End();
-        batch.Completed += (_, _) => Settle(id);
+        _pill.StartAnimation("CornerRadius", Spring(radius));
     }
 
-    private void Settle(int id)
+    private SpringVector2NaturalMotionAnimation Spring(Vector2 to)
     {
-        if (id != _morphId)
+        var spring = _compositor.CreateSpringVector2Animation();
+        spring.FinalValue = to;
+        spring.DampingRatio = 0.82f;
+        spring.Period = TimeSpan.FromMilliseconds(48);
+        return spring;
+    }
+
+    /// <summary>The pill, its soft shadow, and the clip that keeps the content inside the pill while it morphs.</summary>
+    private void BuildPill()
+    {
+        var canvas = new Vector2(CanvasWidth, CanvasHeight);
+        var container = _compositor.CreateContainerVisual();
+        container.Size = canvas;
+
+        // The shadow takes its shape from an off-screen copy of the pill, so it follows every morph.
+        var maskShape = _compositor.CreateSpriteShape(_pill);
+        maskShape.FillBrush = _compositor.CreateColorBrush(Color.FromArgb(255, 255, 255, 255));
+        var maskVisual = _compositor.CreateShapeVisual();
+        maskVisual.Size = canvas;
+        maskVisual.Shapes.Add(maskShape);
+        var surface = _compositor.CreateVisualSurface();
+        surface.SourceVisual = maskVisual;
+        surface.SourceSize = canvas;
+        var shadow = _compositor.CreateDropShadow();
+        shadow.Mask = _compositor.CreateSurfaceBrush(surface);
+        shadow.BlurRadius = 26;
+        shadow.Offset = new Vector3(0, 7, 0);
+        shadow.Color = Color.FromArgb(150, 0, 0, 0);
+        var shadowVisual = _compositor.CreateSpriteVisual();
+        shadowVisual.Size = canvas;
+        shadowVisual.Shadow = shadow;
+        container.Children.InsertAtBottom(shadowVisual);
+
+        var shape = _compositor.CreateSpriteShape(_pill);
+        shape.FillBrush = _compositor.CreateColorBrush(Color.FromArgb(255, 13, 14, 17));
+        shape.StrokeBrush = _compositor.CreateColorBrush(Color.FromArgb(38, 255, 255, 255));
+        shape.StrokeThickness = 1;
+        var pillVisual = _compositor.CreateShapeVisual();
+        pillVisual.Size = canvas;
+        pillVisual.Shapes.Add(shape);
+        container.Children.InsertAtTop(pillVisual);
+        ElementCompositionPreview.SetElementChildVisual(PillHost, container);
+
+        // Keeps the pill horizontally centred while its size springs.
+        var centre = _compositor.CreateExpressionAnimation("Vector2((width - pill.Size.X) / 2, top)");
+        centre.SetScalarParameter("width", CanvasWidth);
+        centre.SetScalarParameter("top", PillTop);
+        centre.SetReferenceParameter("pill", _pill);
+        _pill.StartAnimation("Offset", centre);
+
+        Panel.Margin = new Thickness(0, PillTop, 0, 0);
+        ElementCompositionPreview.GetElementVisual(ClipHost).Clip = _compositor.CreateGeometricClip(_pill);
+    }
+
+    // ------------------------------------------------------------------ the sign on the left
+
+    private void SetSign(Sign sign, string? glyph = null, Color? glyphColor = null)
+    {
+        StopSigns();
+        Mark.Visibility = sign == Sign.Mark ? Visibility.Visible : Visibility.Collapsed;
+        Spinner.Visibility = sign == Sign.Spinner ? Visibility.Visible : Visibility.Collapsed;
+        Spinner.IsActive = sign == Sign.Spinner;
+        Bars.Visibility = sign is Sign.Listening or Sign.Speaking ? Visibility.Visible : Visibility.Collapsed;
+        Glyph.Visibility = sign == Sign.Glyph ? Visibility.Visible : Visibility.Collapsed;
+        if (sign == Sign.Glyph)
         {
-            return; // a newer morph took over
+            Glyph.Glyph = glyph ?? "";
+            Glyph.Foreground = glyphColor is { } colour ? new SolidColorBrush(colour) : (Brush)Application.Current.Resources["AldrenBrandBrush"];
         }
 
-        if (State == IslandState.Hidden)
+        if (sign is Sign.Listening or Sign.Speaking)
         {
-            _cursorTimer.Stop();
-            WindowStyles.Hide(_hwnd);
-            _visible = false;
+            StartBars(listening: sign == Sign.Listening);
         }
     }
 
-    private void LayoutPanel(Vector2 size, IslandState state)
+    /// <summary>Four bars: quick and uneven while ALDREN listens, slower and rolling while it speaks.</summary>
+    private void StartBars(bool listening)
     {
-        if (state == IslandState.Hidden)
+        Microsoft.UI.Xaml.Shapes.Rectangle[] bars = [Bar1, Bar2, Bar3, Bar4];
+        int[] periods = listening ? [520, 430, 610, 470] : [920, 780, 860, 720];
+        float[] lows = listening ? [0.32f, 0.22f, 0.4f, 0.28f] : [0.45f, 0.3f, 0.5f, 0.38f];
+        float[] rest = [0.55f, 0.9f, 0.7f, 0.45f];
+        var ease = _compositor.CreateCubicBezierEasingFunction(new Vector2(0.45f, 0f), new Vector2(0.55f, 1f));
+        for (var i = 0; i < bars.Length; i++)
         {
-            Panel.Opacity = 0;
-            return;
+            var visual = ElementCompositionPreview.GetElementVisual(bars[i]);
+            visual.CenterPoint = new Vector3(1.5f, 8f, 0);
+            if (!_uiSettings.AnimationsEnabled)
+            {
+                visual.Scale = new Vector3(1, rest[i], 1);
+                continue;
+            }
+
+            var wave = _compositor.CreateVector3KeyFrameAnimation();
+            wave.InsertKeyFrame(0f, new Vector3(1, lows[i], 1));
+            wave.InsertKeyFrame(0.5f, Vector3.One, ease);
+            wave.InsertKeyFrame(1f, new Vector3(1, lows[i], 1), ease);
+            wave.Duration = TimeSpan.FromMilliseconds(periods[i]);
+            wave.DelayTime = TimeSpan.FromMilliseconds(i * 70);
+            wave.IterationBehavior = AnimationIterationBehavior.Forever;
+            visual.StartAnimation("Scale", wave);
+        }
+    }
+
+    private void StopSigns()
+    {
+        foreach (var bar in (Microsoft.UI.Xaml.Shapes.Rectangle[])[Bar1, Bar2, Bar3, Bar4])
+        {
+            ElementCompositionPreview.GetElementVisual(bar).StopAnimation("Scale");
         }
 
-        Panel.Width = Math.Max(0, size.X - 40);
-        Panel.Height = Math.Max(0, size.Y - 20);
-        Panel.Margin = new Thickness(0, PillTop + 10, 0, 0);
-        Caption.Visibility = Caption.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
-        Caption.TextAlignment = state == IslandState.Reply ? Microsoft.UI.Xaml.TextAlignment.Left : Microsoft.UI.Xaml.TextAlignment.Center;
-        Panel.Opacity = 1;
+        Spinner.IsActive = false;
+    }
+
+    // ------------------------------------------------------------------ timing, placement, click-through
+
+    /// <summary>How long an answer stays without being touched: longer for longer text; hovering holds it.</summary>
+    private static TimeSpan ReadingTime(string text) => TimeSpan.FromSeconds(Math.Clamp(6 + text.Length * 0.06, 10, 90));
+
+    private void RestartIdle(TimeSpan after)
+    {
+        _idleTimer.Stop();
+        _idleTimer.Interval = after;
+        _idleTimer.Start();
     }
 
     /// <summary>Top centre of the work area of the monitor you're working on, sized for its DPI.</summary>
@@ -568,21 +998,11 @@ public sealed partial class IslandWindow : Window
     /// <summary>Screen rectangle (physical pixels) of the pill once the current morph settles.</summary>
     private RECT PillRect()
     {
-        var size = IslandShapes.For(State).Size;
         var scale = WindowStyles.GetDpiForWindow(_hwnd) / 96.0;
         var window = WindowStyles.WindowRect(_hwnd);
-        var left = window.Left + (int)Math.Round((CanvasWidth - size.X) / 2 * scale);
+        var left = window.Left + (int)Math.Round((CanvasWidth - _target.X) / 2 * scale);
         var top = window.Top + (int)Math.Round(PillTop * scale);
-        return new RECT(left, top, left + (int)Math.Round(size.X * scale), top + (int)Math.Round(size.Y * scale));
-    }
-
-    private SpringVector2NaturalMotionAnimation Spring(Vector2 to)
-    {
-        var spring = _compositor.CreateSpringVector2Animation();
-        spring.FinalValue = to;
-        spring.DampingRatio = 0.78f;
-        spring.Period = TimeSpan.FromMilliseconds(45);
-        return spring;
+        return new RECT(left, top, left + (int)Math.Round(_target.X * scale), top + (int)Math.Round(_target.Y * scale));
     }
 
     // Compares against the window's real style rather than a cached flag, so a style reset by WinUI gets repaired.
@@ -596,6 +1016,13 @@ public sealed partial class IslandWindow : Window
         }
 
         _lastWanted = wanted;
+
+        // The pointer resting on an answer means you're reading it: it stays.
+        if (inside && _idleTimer.IsRunning && State is IslandState.Reply or IslandState.Error)
+        {
+            _idleTimer.Stop();
+            _idleTimer.Start();
+        }
     }
 
     private nint WndProc(nint hwnd, uint msg, nint wParam, nint lParam, nuint id, nuint refData)

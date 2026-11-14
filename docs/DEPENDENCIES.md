@@ -29,8 +29,14 @@ Direct packages of the Phase 1 solution (`src/` and its tests). Versions for `sr
 | DocumentFormat.OpenXml | 3.5.1 | MIT | Windows (files) | Reading DOCX locally (`zxdOf5VVCe/u…`) |
 | System.Data.OleDb | 10.0.14 | MIT | Windows (files) | Read-only queries to the Windows Search index (`xYI6L1KwgZMk…`) |
 | AngleSharp | 1.10.0 | MIT | Research | Extracting the main text of fetched web pages (Phase 6; `jibGB16fKOT+…`) |
+| Google.Apis.Auth | 1.78.0 | Apache-2.0 | Integrations.Google | OAuth for your own Google client; token kept in Credential Manager (Phase 7; `C+Jzd1tTqZ3/…`, nupkg SHA-256 `e37ffa5aac6fe4fcea3348f2833a16cb35bb8353b875adc01056524a1c37b6ee`) |
+| Google.Apis.Calendar.v3 | 1.78.0.4285 | Apache-2.0 | Integrations.Google | Calendar agenda, create, delete (Phase 7; `6OzXfEYUzZz7…`, SHA-256 `2fa670248dc1a1bc7355ac8de96c0e1b8b2904bc3f786064ebf3a1d5d22bda1a`) |
+| Google.Apis.Drive.v3 | 1.78.0.4313 | Apache-2.0 | Integrations.Google | Drive search, download, upload, rename (Phase 7; `aQ6ZvjFdEKQH…`, SHA-256 `1616cf52cbd034433e0eb193ee6ff3fba2a6889bfdb2965530d676b2f10ef535`) |
+| Velopack | 1.2.161 | MIT | Core | Install, update and uninstall hooks (Phase 9; `OpHNacIumnkh…`, SHA-256 `d57275692b299751a12ee3e18283b5f7fe3e55339f96b1623345da095dc484ed`) |
 
 Outside NuGet (Phase 6): portable Node.js 24.22.2 LTS for win-x64 in `E:\AldrenData\gateway\node-v24.22.2-win-x64`, SHA-256 `ca1bff5d8ead13c9f2ea404a176db46bd430704d5b5113734049fa365e7799e2` (nodejs.org SHASUMS256.txt), running the pinned FreeLLMAPI 0.16.14 in `E:\AldrenData\gateway\freellmapi-0.16.14`.
+
+Outside the solution (Phase 9): the Velopack CLI `vpk` 1.2.161, a .NET tool in `E:AldrenData	oolsvpk` (nupkg SHA-256 `ac9be73846d9a7a76483f8684abd1503cd50703b992727429dcdc045589c5e08`), used only by `toolseleasepack.ps1`. The Chrome extension in `extensions/chrome` has no third-party code.
 
 Notable transitive packages: the Microsoft.Extensions 10.0.14 family, Serilog.Extensions.Logging 10.0.0, SQLitePCLRaw 2.1.13 (native SQLite), MessagePack, Nerdbank.MessagePack, Nerdbank.Streams, Newtonsoft.Json, Microsoft.VisualStudio.Threading and Microsoft.VisualStudio.Validation (via StreamJsonRpc), and CsWin32's Win32 metadata packages (build only).
 

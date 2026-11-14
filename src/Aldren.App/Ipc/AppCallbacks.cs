@@ -7,7 +7,9 @@ public sealed class AppCallbacks(
     Func<ConfirmationRequest, CancellationToken, Task<bool>> confirm,
     Action<string, string> notify,
     Action<VoiceState, string> showVoice,
-    Action<string?> showCloud) : IAldrenApp
+    Action<string?> showCloud,
+    Action<string> showReplyProgress,
+    Func<Task> yieldFocus) : IAldrenApp
 {
     public Task<bool> ConfirmAsync(ConfirmationRequest request, CancellationToken cancellationToken) =>
         confirm(request, cancellationToken);
@@ -29,4 +31,12 @@ public sealed class AppCallbacks(
         showCloud(activity);
         return Task.CompletedTask;
     }
+
+    public Task ShowReplyProgressAsync(string text, CancellationToken cancellationToken)
+    {
+        showReplyProgress(text);
+        return Task.CompletedTask;
+    }
+
+    public Task YieldFocusAsync(CancellationToken cancellationToken) => yieldFocus();
 }

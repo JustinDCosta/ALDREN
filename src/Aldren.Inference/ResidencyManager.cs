@@ -41,6 +41,11 @@ public sealed class ResidencyManager(
 
     public event Action<bool>? GamingModeChanged;
 
+    /// <summary>The running model processes, for the memory figures in Settings.</summary>
+    public int? GpuProcessId => _gpu is { HasExited: false } gpu ? gpu.ProcessId : null;
+
+    public int? CpuProcessId => _cpu is { HasExited: false } cpu ? cpu.ProcessId : null;
+
     public ResidencyStatus Status => new(
         _gpu is { HasExited: false }, _cpu is { HasExited: false }, GamingMode, _gamingDetected, GamingOverride,
         PowerStatus.OnAcPower(), Nvml.FreeMiB());

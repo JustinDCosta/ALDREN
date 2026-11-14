@@ -28,6 +28,18 @@ public sealed class PermissionCatalog
     public const string ScreenAct = "screen.act";
     public const string ClipboardRead = "clipboard.read";
     public const string ClipboardWrite = "clipboard.write";
+    public const string BrowserRead = "browser.read";
+    public const string BrowserAct = "browser.act";
+    public const string BrowserDownload = "browser.download";
+    public const string CalendarRead = "google.calendar.read";
+    public const string CalendarWrite = "google.calendar.write";
+    public const string DriveRead = "google.drive.read";
+    public const string DriveWrite = "google.drive.write";
+    public const string Focus = "focus.control";
+    public const string FocusEnforce = "focus.enforce";
+    public const string Routines = "assistant.routines";
+    public const string DevGit = "dev.git";
+    public const string Dictation = "voice.dictation";
 
     private readonly Dictionary<string, PermissionDefinition> _definitions;
 
@@ -83,6 +95,23 @@ public sealed class PermissionCatalog
         new PermissionDefinition(ScreenAct, "Operate controls in apps (sensitive ones ask first)", GrantedByDefault: true),
         new PermissionDefinition(ClipboardRead, "Read the clipboard when you ask", GrantedByDefault: true),
         new PermissionDefinition(ClipboardWrite, "Copy text to the clipboard", GrantedByDefault: true),
+    ]);
+
+    public static PermissionCatalog Phase9 { get; } = new(
+    [
+        .. Phase5.Definitions,
+        new PermissionDefinition(BrowserRead, "Read your browser tabs and pages", GrantedByDefault: true),
+        new PermissionDefinition(BrowserAct, "Click and fill in web pages (sensitive buttons and forms ask first)", GrantedByDefault: true),
+        new PermissionDefinition(BrowserDownload, "Download files in the browser (programs ask first)", GrantedByDefault: true),
+        new PermissionDefinition(CalendarRead, "Read your Google Calendar", GrantedByDefault: true),
+        new PermissionDefinition(CalendarWrite, "Create and delete calendar events (deleting asks first)", GrantedByDefault: true),
+        new PermissionDefinition(DriveRead, "Search and download from Google Drive", GrantedByDefault: true),
+        new PermissionDefinition(DriveWrite, "Upload, rename and move in Google Drive (asks first)", GrantedByDefault: true),
+        new PermissionDefinition(Focus, "Run focus sessions", GrantedByDefault: true),
+        new PermissionDefinition(FocusEnforce, "During focus sessions, minimise and close distracting apps", GrantedByDefault: true),
+        new PermissionDefinition(Routines, "Create and run routines", GrantedByDefault: true),
+        new PermissionDefinition(DevGit, "Read git status, history and changes in your repositories", GrantedByDefault: true),
+        new PermissionDefinition(Dictation, "Type what you dictate into the focused field", GrantedByDefault: true),
     ]);
 
     public IReadOnlyCollection<PermissionDefinition> Definitions => _definitions.Values;

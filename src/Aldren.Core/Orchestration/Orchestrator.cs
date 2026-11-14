@@ -22,6 +22,9 @@ public sealed partial class Orchestrator(
     ActionBrain action,
     ResearchBrain research,
     ICloudFallback cloud,
+    Settings.SettingsStore settings,
+    Tools.RoutineStore routines,
+    ModeState modes,
     TimeProvider time,
     ILogger<Orchestrator> log)
 {
@@ -40,6 +43,7 @@ public sealed partial class Orchestrator(
         "calculate", "delegate_to_action", "request_research",
         "remember", "recall", "forget", "create_reminder", "list_reminders", "cancel_reminder", "snooze_reminder",
         "add_task", "list_tasks", "complete_task", "daily_briefing", "presence_status",
+        "calendar_agenda", "calendar_create", "start_focus", "end_focus", "focus_status", "create_routine", "list_routines",
     ];
 
     private readonly List<(string Role, string Content)> _turns = [];
@@ -53,7 +57,7 @@ public sealed partial class Orchestrator(
     [GeneratedRegex(@"\bI(?:'ll| will|'ve| have|'m going to| am going to)(?: just)? (?:start|set|open|launch|play|pause|skip|stop|mute|unmute|turn|switch|close)(?:ed|ing)?\b", RegexOptions.IgnoreCase)]
     private static partial Regex ClaimsAction();
     // Screen, window, file and clipboard requests go straight to the Action Brain (Phase 5).
-    [GeneratedRegex(@"\b(on (?:my|the) screen|this error|this window|this page|this file|this folder|what am i looking at|whats this|what is this|click|press the|tap on|type (?:into|in the)|fill in|scroll|the (?:first|second|third|last) (?:one|result|link|item)|select the|snap|arrange|layout|monitor|window|file|files|folder|document|pdf|downloads|clipboard|copied|duplicates?|rename|move (?:it|this|that|the))\b")]
+    [GeneratedRegex(@"\b(on (?:my|the) screen|this error|this window|this page|this file|this folder|what am i looking at|whats this|what is this|click|press the|tap on|type (?:into|in the)|fill in|scroll|the (?:first|second|third|last) (?:one|result|link|item)|select the|snap|arrange|layout|monitor|window|file|files|folder|document|pdf|downloads|clipboard|copied|duplicates?|rename|move (?:it|this|that|the)|page|tab|tabs|website|site|link|browser|download (?:this|that|it)|drive|git|repo|repository|commits?|type (?:this|that|it))\b")]
     private static partial Regex ActionTrigger();
 
     /// <param name="onText">Receives the Quick Brain's reply as it is written (for speech); fast-path replies only come back at the end.</param>
@@ -86,6 +90,22 @@ public sealed partial class Orchestrator(
         }
     }
 
+    /// <summary>A new conversation: the earlier turns and any pending question ("want me to look that up?") are dropped.</summary>
+    public async Task ResetAsync(CancellationToken ct)
+    {
+        await _one.WaitAsync(ct);
+        try
+        {
+            _turns.Clear();
+            _pendingResearch = null;
+            _pendingRoutine = null;
+        }
+        finally
+        {
+            _one.Release();
+        }
+    }
+
     private async Task<(string Reply, string Route)> RouteAsync(string text, Action<string>? onText, CancellationToken ct)
     {
         // A yes to "want me to look that up online?" sends the earlier question; anything else drops the offer.
@@ -102,6 +122,11 @@ public sealed partial class Orchestrator(
         {
             var outcome = await InvokeAsync("diagnostics_confirm_test", [], Typed, ct);
             return (outcome.Status == ToolOutcomeStatus.Succeeded ? "Confirmation test passed." : outcome.Message, "fast path");
+        }
+
+        if (await RoutineOrModeAsync(text, onText, ct) is { } handled)
+        {
+            return handled;
         }
 
         switch (FastPath.Match(text))
@@ -137,6 +162,101 @@ public sealed partial class Orchestrator(
         return await QuickBrainAsync(text, onText, ct);
     }
 
+    [GeneratedRegex(@"^(?:switch to|go|use|be in|enter) (?<mode>friendly|professional|sarcastic|serious|concise|detailed) mode$|^be (?:more )?(?<mode>friendly|professional|sarcastic|serious|concise|detailed)$")]
+    private static partial Regex PersonalityCommand();
+
+    private static readonly AsyncLocal<bool> InRoutine = new();
+    private string? _pendingRoutine;
+
+    [GeneratedRegex(@"^(?:please )?(?:create|make|add|save|set up)\s+(?:a |an )?(?:new )?routine\s+(?:called|named)\s+(?<name>[^:,.;]+?)(?:\s*[:,.;]\s*|\s+(?:to|that|which)\s+|$)(?<steps>.*)$", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    private static partial Regex CreateRoutine();
+
+
+    [GeneratedRegex(@"^(?:run (?:my |the )?)?(?<name>.+?)(?: routine)?$")]
+    private static partial Regex RoutineCommand();
+
+    /// <summary>
+    /// Phase 9 commands handled here: a saved routine's phrase runs its steps one by one through the normal path (so every
+    /// action is still checked by the Tool Gateway); personality and silent mode switch at once.
+    /// </summary>
+    private async Task<(string Reply, string Route)?> RoutineOrModeAsync(string text, Action<string>? onText, CancellationToken ct)
+    {
+        var p = FastPath.Normalize(text);
+        if (_pendingRoutine is { } pendingName)
+        {
+            _pendingRoutine = null;
+            if (p is "cancel" or "never mind" or "nevermind" or "nothing" or "forget it")
+            {
+                return ("Okay, no routine.", "fast path (routine)");
+            }
+
+            return (Describe("create_routine", await InvokeAsync("create_routine", new JsonObject { ["name"] = pendingName, ["steps"] = text }, Typed, ct)), "fast path (routine)");
+        }
+
+        if (CreateRoutine().Match(text.Trim().TrimEnd('.', '!')) is { Success: true } create)
+        {
+            var name = create.Groups["name"].Value.Trim();
+            var steps = create.Groups["steps"].Value.Trim();
+            if (steps.Length == 0)
+            {
+                _pendingRoutine = name;
+                return ($"What should the {name} routine do? Say the steps, like \"open Notepad, then set a timer for 5 minutes\".", "fast path (routine)");
+            }
+
+            return (Describe("create_routine", await InvokeAsync("create_routine", new JsonObject { ["name"] = name, ["steps"] = steps }, Typed, ct)), "fast path (routine)");
+        }
+
+        if (p is "help" or "what can you do" or "what can i say" or "what can i ask you" or "what are you able to do" or "what do you do")
+        {
+            return ("I can open apps and websites, control volume and music, set timers and reminders, keep your task list and remember things you tell me. I can read your screen and click, type or tidy files for you, run focus sessions that keep distractions away, take dictation, and research things online when you ask, with sources. Say it or type it the way you would to a person, boss.", "fast path (help)");
+        }
+
+        if (p is "silent mode" or "silent mode on" or "be quiet" or "go silent" or "stop talking out loud")
+        {
+            modes.Silent = true;
+            return ("Silent mode on: I'll answer in text only until you say \"silent mode off\".", "fast path (silent mode)");
+        }
+
+        if (p is "silent mode off" or "you can talk again" or "speak again" or "talk to me again")
+        {
+            modes.Silent = false;
+            return ("Silent mode off. I'm back, boss.", "fast path (silent mode)");
+        }
+
+        if (PersonalityCommand().Match(p) is { Success: true } mode)
+        {
+            var chosen = mode.Groups["mode"].Value;
+            var current = settings.Current;
+            await settings.SaveAsync(current with { General = current.General with { Personality = chosen } }, ct);
+            return (chosen switch
+            {
+                "concise" => "Concise mode.",
+                "sarcastic" => "Sarcastic mode. Oh, this will be fun.",
+                "professional" => "Professional mode enabled.",
+                "serious" => "Serious mode.",
+                "detailed" => "Detailed mode: I'll explain more.",
+                _ => "Back to my usual self, boss.",
+            }, "fast path (personality)");
+        }
+
+        if (!InRoutine.Value && routines.All().Count > 0 && RoutineCommand().Match(p) is { Success: true } r && routines.Find(r.Groups["name"].Value) is { } routine)
+        {
+            // A step never starts another routine (no loops).
+            InRoutine.Value = true;
+            var replies = new List<string>();
+            foreach (var step in routine.Steps)
+            {
+                var (reply, _) = await RouteAsync(step, null, ct);
+                replies.Add(reply);
+                onText?.Invoke(reply + " ");
+            }
+
+            return ($"Routine \"{routine.Name}\": {string.Join(" ", replies)}", $"routine ({routine.Steps.Count} steps)");
+        }
+
+        return null;
+    }
+
     private async Task<(string Reply, string Route)> QuickBrainAsync(string text, Action<string>? onText, CancellationToken ct)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -154,7 +274,7 @@ public sealed partial class Orchestrator(
 
         var messages = new JsonArray
         {
-            new JsonObject { ["role"] = "system", ["content"] = Persona.SystemPrompt },
+            new JsonObject { ["role"] = "system", ["content"] = Persona.For(settings.Current.General.Personality) },
         };
         foreach (var (role, content) in _turns)
         {

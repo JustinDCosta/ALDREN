@@ -6,6 +6,19 @@ namespace Aldren.Core.Orchestration;
 /// </summary>
 public static class Persona
 {
+    /// <summary>Personality modes (Phase 9): an overlay on the one persona, never a different assistant.</summary>
+    public static readonly IReadOnlyDictionary<string, string> Modes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["friendly"] = "",
+        ["professional"] = "\n## Mode: professional\nCourteous and precise; no jokes; say \"boss\" rarely.",
+        ["sarcastic"] = "\n## Mode: sarcastic\nDry, playful sarcasm is welcome (the user asked for it), never mean or insulting.",
+        ["serious"] = "\n## Mode: serious\nCalm and matter-of-fact; no humour.",
+        ["concise"] = "\n## Mode: concise\nAnswer in as few words as possible; one sentence when it will do.",
+        ["detailed"] = "\n## Mode: detailed\nGive fuller explanations with the reasoning, still in plain prose.",
+    };
+
+    public static string For(string? mode) => SystemPrompt + (mode is not null && Modes.TryGetValue(mode, out var overlay) ? overlay : "");
+
     public const string SystemPrompt = """
         You are ALDREN, a personal assistant running locally on the user's Windows 11 laptop. You talk with the user by voice and by text. You call the user "boss".
 

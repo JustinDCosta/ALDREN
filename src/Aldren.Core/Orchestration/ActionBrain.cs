@@ -33,10 +33,13 @@ public sealed class ActionBrain(
         "find_files", "recent_files", "list_downloads", "vscode_recent", "open_file", "read_document", "move_file", "rename_file",
         "delete_file", "find_duplicates", "undo_file_action", "read_clipboard", "copy_text",
         "launch_app", "focus_app", "close_app", "create_reminder", "add_task", "calculate",
+        "browser_tabs", "browser_read_page", "browser_open", "browser_click", "browser_fill", "browser_download", "browser_navigate", "browser_switch_tab",
+        "calendar_agenda", "calendar_create", "calendar_delete", "drive_search", "drive_download", "drive_upload", "drive_rename", "git_overview", "type_text",
     ];
 
     private static readonly HashSet<string> ChangesScreen =
-        ["press_control", "type_into_control", "operate_control", "move_window", "apply_layout", "launch_app", "focus_app", "close_app", "open_file"];
+        ["press_control", "type_into_control", "operate_control", "move_window", "apply_layout", "launch_app", "focus_app", "close_app", "open_file",
+        "browser_open", "browser_click", "browser_fill", "browser_navigate", "browser_switch_tab", "type_text"];
 
     private const string Prompt = """
         You are ALDREN's Action Brain: the part of ALDREN, a calm and capable personal assistant who calls the user "boss", that sees and operates the user's Windows PC.
@@ -46,6 +49,8 @@ public sealed class ActionBrain(
         How to work:
         - Use the [ids] from the latest screen with press_control, type_into_control and operate_control. If the right control isn't obvious, call find_control with a short description. Use look_at_screen only when the control list and visible text can't answer (images, layout, colours).
         - For "what's this error" or "what's on my screen", read the controls and visible text first and answer from them.
+        - Browser (Chrome or Edge with the ALDREN Companion): browser_read_page lists the page's links and fields with [ids]; then browser_click, browser_fill, browser_navigate, browser_open, browser_switch_tab. "Open the second result" means read the page, then click that result's id. If the Companion isn't connected, use the controls instead.
+        - Google: calendar_agenda, calendar_create, calendar_delete; drive_search, then drive_download, drive_upload or drive_rename with the ids it returns. Code: git_overview for the repository open in VS Code.
         - Files: find_files, recent_files, list_downloads, then open_file, read_document, move_file, rename_file, delete_file with the full paths those return. Windows: move_window, apply_layout, save_layout.
         - Do only what was asked. After each action you get the screen again; stop as soon as the request is done.
         - Never type passwords or card numbers. Buttons that send, pay, delete or sign out ask the user first; that's expected.

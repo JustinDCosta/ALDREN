@@ -1,6 +1,8 @@
 using System.Collections.Specialized;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Windows.System;
 
@@ -8,19 +10,31 @@ namespace Aldren.App.Expanded;
 
 /// <summary>
 /// The conversation sidebar: docked to the right edge of the screen you're working on, full height, with every typed and
-/// spoken turn of this session. Opened from the tray, with Ctrl+Enter in the text box, or by clicking an answer in the island.
+/// spoken turn of this session. Opened from the tray, with Ctrl+Enter in the text field, or by clicking an answer in the island.
 /// </summary>
 public sealed partial class ExpandedWindow : Window
 {
-    private const int Width = 440;
+    private const int WidthDip = 440;
+
+    // Follow new text only while you're at the bottom; scrolled up to read, the view stays where you put it.
+    private bool _stickToEnd = true;
 
     public ExpandedWindow()
     {
         InitializeComponent();
-        DockRight();
+        WindowChrome.Apply(this, Root, TitleBar);
+        if (AppWindow.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.IsMaximizable = false;
+            presenter.IsMinimizable = false;
+        }
+
+        WindowChrome.DockRight(this, WindowChrome.CurrentMonitor(), WidthDip);
+
         var conversation = ShellApp.Instance.Conversation;
-        Conversation.ItemsSource = conversation;
+        Messages.ItemsSource = conversation;
         conversation.CollectionChanged += OnConversationChanged;
+        ShowEmptyState();
         WindowKeys.CloseOnEscape(this, Root);
         Root.Loaded += (_, _) =>
         {
@@ -38,6 +52,13 @@ public sealed partial class ExpandedWindow : Window
         };
     }
 
+    private void ShowEmptyState()
+    {
+        var empty = ShellApp.Instance.Conversation.Count == 0;
+        Empty.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
+        NewButton.IsEnabled = !empty;
+    }
+
     private void OnSpeakingChanged(bool speaking) =>
         StopSpeakingButton.Visibility = speaking ? Visibility.Visible : Visibility.Collapsed;
 
@@ -47,63 +68,79 @@ public sealed partial class ExpandedWindow : Window
         ShellApp.Instance.StopSpeaking();
     }
 
-    private void DockRight()
+    private void OnConversationChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        Windows.Win32.PInvoke.GetCursorPos(out var cursor);
-        var area = DisplayArea.GetFromPoint(new Windows.Graphics.PointInt32(cursor.X, cursor.Y), DisplayAreaFallback.Primary).WorkArea;
-        AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(area.X + area.Width - Width, area.Y, Width, area.Height));
-    }
-
-    private void OnConversationChanged(object? sender, NotifyCollectionChangedEventArgs e) => ScrollToEnd();
-
-    private void ScrollToEnd()
-    {
-        if (ShellApp.Instance.Conversation is { Count: > 0 } items)
+        ShowEmptyState();
+        if (e.Action == NotifyCollectionChangedAction.Add)
         {
-            Conversation.ScrollIntoView(items[^1]);
+            // A new turn always comes into view, wherever you had scrolled to.
+            _stickToEnd = true;
         }
     }
 
-    private void OnInputKeyDown(object sender, KeyRoutedEventArgs e)
+    private void OnScrollViewChanged(object? sender, ScrollViewerViewChangedEventArgs e) =>
+        _stickToEnd = Scroll.VerticalOffset >= Scroll.ScrollableHeight - 48;
+
+    // New turns and text still being written both change the list's height.
+    private void OnMessagesSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (_stickToEnd)
+        {
+            ScrollToEnd();
+        }
+    }
+
+    private void ScrollToEnd() =>
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            Scroll.UpdateLayout();
+            Scroll.ChangeView(null, Scroll.ScrollableHeight, null, disableAnimation: true);
+        });
+
+    private void OnInputTextChanged(object sender, TextChangedEventArgs e) => SendButton.IsEnabled = Input.Text.Trim().Length > 0;
+
+    private void OnInputPreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
         if (e.Key == VirtualKey.Enter)
         {
             e.Handled = true;
-            _ = SendAsync();
+            Send(Input.Text);
         }
     }
 
-    private void OnSendClick(object sender, RoutedEventArgs e) => _ = SendAsync();
+    private void OnSendClick(object sender, RoutedEventArgs e) => Send(Input.Text);
 
-    private async Task SendAsync()
+    private void OnSuggestionClick(object sender, RoutedEventArgs e)
     {
-        var text = Input.Text.Trim();
+        if (sender is Button { Content: string suggestion })
+        {
+            Send(suggestion);
+        }
+    }
+
+    private void Send(string text)
+    {
+        text = text.Trim();
         if (text.Length == 0)
         {
             return;
         }
 
-        var conversation = ShellApp.Instance.Conversation;
         Input.Text = "";
-        conversation.Add("You: " + text);
-        if (ShellApp.Instance.Core is not { } core)
-        {
-            conversation.Add("ALDREN: I'm not connected to Core right now.");
-            return;
-        }
+        Input.Focus(FocusState.Programmatic);
+        // The reply lands in the conversation (and fills in while it is written); nothing to wait for here.
+        _ = ShellApp.Instance.AskAsync(text);
+    }
 
-        SendButton.IsEnabled = false;
-        try
+    private void OnMicClick(object sender, RoutedEventArgs e)
+    {
+        if (ShellApp.Instance.Core is { } core)
         {
-            conversation.Add("ALDREN: " + await core.SubmitTextAsync(text, CancellationToken.None));
-        }
-        catch (Exception ex)
-        {
-            conversation.Add("ALDREN: Something went wrong: " + ex.Message);
-        }
-        finally
-        {
-            SendButton.IsEnabled = true;
+            _ = core.PushToTalkAsync(CancellationToken.None);
         }
     }
+
+    private void OnNewClick(object sender, RoutedEventArgs e) => _ = ShellApp.Instance.NewConversationAsync();
+
+    private void OnSettingsClick(object sender, RoutedEventArgs e) => ShellApp.Instance.ShowSettings();
 }

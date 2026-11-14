@@ -22,7 +22,7 @@ public static partial class FastPath
     {
         ["a"] = 1, ["an"] = 1, ["one"] = 1, ["two"] = 2, ["three"] = 3, ["four"] = 4, ["five"] = 5, ["six"] = 6,
         ["seven"] = 7, ["eight"] = 8, ["nine"] = 9, ["ten"] = 10, ["fifteen"] = 15, ["twenty"] = 20, ["thirty"] = 30,
-        ["forty"] = 40, ["fifty"] = 50, ["sixty"] = 60, ["ninety"] = 90, ["hundred"] = 100,
+        ["forty"] = 40, ["forty five"] = 45, ["fifty"] = 50, ["sixty"] = 60, ["ninety"] = 90, ["hundred"] = 100,
     };
 
     [GeneratedRegex(@"^(?:please )?(?:open|launch|start|run)(?: up)? (?<app>.{2,60}?)(?: for me)?(?: please)?$")]
@@ -46,6 +46,23 @@ public static partial class FastPath
     [GeneratedRegex(@"^(?:whats |what is |calculate |compute |how much is )(?<expr>[\d\s\.\+\-\*/x×÷%\^\(\)]+)$")]
     private static partial Regex Calc();
 
+    [GeneratedRegex(@"^(?:start (?:a )?focus(?: session| mode)?|focus mode|lets focus|help me focus|focus|i need to focus|start focusing)(?: for (?<n>\d+|an?|one|two|three|four|five|ten|fifteen|twenty|thirty|forty|forty five|fifty|sixty|ninety) (?<unit>minutes?|mins?|hours?))?(?: (?:on|for) (?<goal>.+?))?(?: for (?<n>\d+|an?|one|two|three|four|five|ten|fifteen|twenty|thirty|forty|forty five|fifty|sixty|ninety) (?<unit>minutes?|mins?|hours?))?$")]
+    private static partial Regex StartFocus();
+
+    [GeneratedRegex(@"\b(work|project|code|coding|report|email|emails|meeting|client|job)\b")]
+    private static partial Regex WorkWords();
+
+    // "open github.com", "go to news.ycombinator.com": anything that is a web address.
+    [GeneratedRegex(@"^(?:please )?(?:open|go to|visit|launch|show me|bring up) (?<site>\S+(?: dot \S+)*)(?: (?:in|on) (?:google chrome|chrome|microsoft edge|edge|firefox|the browser|my browser|a new tab))?(?: please)?$")]
+    private static partial Regex OpenAddress();
+
+    // "open youtube on chrome", "open the reddit website": a site by name, when you say it is a site.
+    [GeneratedRegex(@"^(?:please )?(?:open|go to|visit|launch|show me|bring up) (?:the )?(?<site>[a-z ]+?)(?: (?:website|site|page)| (?:in|on) (?:google chrome|chrome|microsoft edge|edge|firefox|the browser|my browser|a new tab))+(?: please)?$")]
+    private static partial Regex OpenInBrowser();
+
+    [GeneratedRegex(@"^(?:please )?(?:search youtube for|youtube|find on youtube|look up on youtube) (?<q>.+)$|^(?:please )?(?:search for|search|find|look up|play) (?<q2>.+?) on youtube$")]
+    private static partial Regex YouTube();
+
     public static FastCommand? Match(string text)
     {
         var raw = text.Trim().TrimEnd('?', '.', '!');
@@ -53,6 +70,23 @@ public static partial class FastPath
         if (expression.Success && expression.Groups["expr"].Value.Any(char.IsDigit) && expression.Groups["expr"].Value.Any(c => "+-*/x×÷%^".Contains(c)))
         {
             return Tool("calculate", new JsonObject { ["expression"] = expression.Groups["expr"].Value.Trim() });
+        }
+
+        var lower = raw.ToLowerInvariant();
+        if (OpenAddress().Match(lower) is { Success: true } address && Tools.WebSites.AddressOf(address.Groups["site"].Value) is { } url)
+        {
+            return Tool("browser_open", new JsonObject { ["url"] = url });
+        }
+
+        if (OpenInBrowser().Match(lower) is { Success: true } named && Tools.WebSites.ByName(named.Groups["site"].Value) is { } site)
+        {
+            return Tool("browser_open", new JsonObject { ["url"] = site });
+        }
+
+        if (YouTube().Match(lower) is { Success: true } video)
+        {
+            var query = video.Groups["q"].Success ? video.Groups["q"].Value : video.Groups["q2"].Value;
+            return Tool("browser_open", new JsonObject { ["url"] = "https://www.youtube.com/results?search_query=" + Uri.EscapeDataString(query) });
         }
 
         var p = Normalize(text);
@@ -267,6 +301,31 @@ public static partial class FastPath
                 return Tool("im_home", []);
             case "am i home" or "am i at home" or "do you know if im home":
                 return Tool("presence_status", []);
+            case "end focus" or "stop focus" or "emergency exit" or "end focus mode" or "stop focus mode" or "end the focus session"
+                or "stop the focus session" or "end my focus session" or "cancel focus" or "exit focus mode":
+                return Tool("end_focus", []);
+            case "focus status" or "how is my focus going" or "hows my focus going" or "how am i doing on focus" or "focus stats"
+                or "how long have i focused" or "how much have i focused this week":
+                return Tool("focus_status", []);
+            case "whats on my calendar" or "what is on my calendar" or "my calendar" or "whats on my calendar today" or "my agenda" or "whats my agenda":
+                return Tool("calendar_agenda", new JsonObject { ["day"] = "today" });
+            case "whats on my calendar tomorrow" or "my calendar tomorrow" or "my agenda tomorrow" or "what do i have tomorrow":
+                return Tool("calendar_agenda", new JsonObject { ["day"] = "tomorrow" });
+            case "list my routines" or "what routines do i have" or "my routines" or "show my routines":
+                return Tool("list_routines", []);
+        }
+
+        if (StartFocus().Match(p) is { Success: true } focus)
+        {
+            var minutes = focus.Groups["n"].Success ? ParseNumber(focus.Groups["n"].Value) ?? 50 : 50;
+            if (focus.Groups["unit"].Value.StartsWith("hour", StringComparison.Ordinal))
+            {
+                minutes *= 60;
+            }
+
+            var goal = focus.Groups["goal"].Success ? focus.Groups["goal"].Value : "";
+            var profile = WorkWords().IsMatch(goal) ? "work" : "study";
+            return Tool("start_focus", new JsonObject { ["goal"] = goal, ["minutes"] = minutes, ["profile"] = profile });
         }
 
         if (RemindMe().Match(p) is { Success: true } remind && SplitReminder(remind.Groups["rest"].Value) is { } reminder)
@@ -404,6 +463,20 @@ public static partial class FastPath
             if (result.StartsWith(prefix, StringComparison.Ordinal))
             {
                 result = result[prefix.Length..];
+            }
+        }
+
+        // Recognition often hears "off" as "of" ("silent mode of"); a request never ends in "of" otherwise.
+        if (result.EndsWith(" of", StringComparison.Ordinal))
+        {
+            result = result[..^3] + " off";
+        }
+
+        foreach (var verb in (string[])["turn of ", "switch of ", "turned of "])
+        {
+            if (result.StartsWith(verb, StringComparison.Ordinal))
+            {
+                result = verb[..^3] + "off " + result[verb.Length..];
             }
         }
 

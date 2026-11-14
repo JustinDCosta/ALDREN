@@ -14,4 +14,13 @@ public interface IAldrenApp
 
     /// <summary>The cloud indicator: what is going online right now, or null when nothing is.</summary>
     Task ShowCloudAsync(string? activity, CancellationToken cancellationToken);
+
+    /// <summary>The reply to the typed request in flight, as far as it has been written (it arrives whole as the call's result).</summary>
+    Task ShowReplyProgressAsync(string text, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Before ALDREN types into the window you were using: the island gives keyboard focus back to it (and stays up
+    /// without focus). Returns once focus has been handed over.
+    /// </summary>
+    Task YieldFocusAsync(CancellationToken cancellationToken);
 }

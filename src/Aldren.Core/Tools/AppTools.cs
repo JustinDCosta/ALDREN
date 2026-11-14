@@ -9,7 +9,7 @@ public sealed record AppArgs(string Name);
 
 public sealed record AppResult(string App, string Detail);
 
-public sealed class LaunchAppTool(AppIndex index) : Tool<AppArgs, AppResult>
+public sealed class LaunchAppTool(AppIndex index, Aldren.Browser.BrowserBridge browser) : Tool<AppArgs, AppResult>
 {
     public override string Name => "launch_app";
     public override string Description => "Open an installed application by name";
@@ -28,8 +28,15 @@ public sealed class LaunchAppTool(AppIndex index) : Tool<AppArgs, AppResult>
 
     protected override async Task<AppResult> ExecuteAsync(AppArgs args, CancellationToken ct)
     {
-        var match = await index.FindAsync(args.Name, ct)
-                    ?? throw new InvalidOperationException($"I couldn't find an app called \"{args.Name}\".");
+        var match = await index.FindAsync(args.Name, ct);
+        if (match is null)
+        {
+            // No such app, but a website by that name ("open youtube"): open the site.
+            var site = WebSites.ByName(args.Name) ?? WebSites.AddressOf(args.Name)
+                       ?? throw new InvalidOperationException($"I couldn't find an app called \"{args.Name}\".");
+            return new AppResult(await WebSites.OpenAsync(browser, site, ct), "opened");
+        }
+
         // AppsFolder ids cover desktop and Store apps alike; the shell resolves and starts them non-elevated.
         using var _ = Process.Start(new ProcessStartInfo($@"shell:AppsFolder\{match.App.AppId}") { UseShellExecute = true });
         return new AppResult(match.App.Name, "opened");

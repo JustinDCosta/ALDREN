@@ -8,31 +8,39 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <NavigationView
-        x:Name="Navigation"
-        AutomationProperties.Name="Settings sections"
-        IsBackButtonVisible="Collapsed"
-        IsSettingsVisible="False"
-        PaneDisplayMode="Left"
-        SelectionChanged="OnSelectionChanged">
-        <NavigationView.MenuItems>
-            <NavigationViewItem Content="General" Tag="General" />
-            <NavigationViewItem Content="Voice &amp; wake word" Tag="Voice" />
-            <NavigationViewItem Content="Local models" Tag="Later:Phase 2" />
-            <NavigationViewItem Content="Cloud (FreeLLMAPI)" Tag="Cloud" />
-            <NavigationViewItem Content="Permissions" Tag="Permissions" />
-            <NavigationViewItem Content="Privacy &amp; data" Tag="Later:Phase 6" />
-            <NavigationViewItem Content="Memory" Tag="Memory" />
-            <NavigationViewItem Content="Reminders &amp; tasks" Tag="Reminders" />
-            <NavigationViewItem Content="Google account" Tag="Later:Phase 4 (blocked: needs your Google Cloud project, see docs/guides/google-oauth.md)" />
-            <NavigationViewItem Content="Focus mode" Tag="Later:Phase 8" />
-            <NavigationViewItem Content="Home &amp; away" Tag="Home" />
-            <NavigationViewItem Content="Modes" Tag="Later:Phase 9" />
-            <NavigationViewItem Content="Automations" Tag="Later:Phase 9" />
-            <NavigationViewItem Content="Activity history" Tag="Activity" />
-            <NavigationViewItem Content="Performance" Tag="Later:Phase 2" />
-            <NavigationViewItem Content="Diagnostics" Tag="Diagnostics" />
-        </NavigationView.MenuItems>
-        <ScrollViewer x:Name="Page" Padding="24,16" />
-    </NavigationView>
+    <Grid x:Name="Root">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid x:Name="TitleBar" Height="44" Padding="16,0,0,0" Background="Transparent" ColumnSpacing="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid Width="18" Height="18" VerticalAlignment="Center">
+                <Ellipse Width="16" Height="16" Stroke="{StaticResource AldrenBrandBrush}" StrokeThickness="2.6" />
+                <Ellipse Width="4.6" Height="4.6" Fill="{StaticResource AldrenBrandBrush}" />
+            </Grid>
+            <TextBlock
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                Style="{ThemeResource CaptionTextBlockStyle}"
+                Text="ALDREN Settings" />
+        </Grid>
+
+        <NavigationView
+            x:Name="Navigation"
+            Grid.Row="1"
+            AutomationProperties.Name="Settings sections"
+            IsBackButtonVisible="Collapsed"
+            IsPaneToggleButtonVisible="False"
+            IsSettingsVisible="False"
+            OpenPaneLength="256"
+            PaneDisplayMode="Left"
+            SelectionChanged="OnSelectionChanged">
+            <ScrollViewer x:Name="Page" Padding="36,24,36,36" HorizontalScrollBarVisibility="Disabled" />
+        </NavigationView>
+    </Grid>
 </Window>
