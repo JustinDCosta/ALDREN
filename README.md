@@ -2,7 +2,7 @@
 
 A local-first, JARVIS-inspired personal AI assistant for Windows 11. You summon it by saying "ALDREN" (pronounced *al-drin*) or by typing. It talks naturally, operates your apps, windows, files and browser through a safety-checked automation layer, understands your screen, manages reminders and your Google calendar, researches online when asked, and helps you focus.
 
-> **Status:** Phases 0–6 are done or in acceptance (Phase 6 needs your provider keys in the gateway dashboard). Phases 7–9 (the browser Companion, Google Calendar and Drive, focus mode, personality modes, routines, voice typing, the developer assistant and the Velopack installer) are implemented and not yet tried through ALDREN; Google needs your own OAuth client. See [docs/STATUS.md](docs/STATUS.md).
+> **Status:** in active development. All planned features are implemented; testing is ongoing. Details are in [docs/STATUS.md](docs/STATUS.md).
 
 ## Design in one minute
 
